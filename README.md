@@ -24,7 +24,7 @@ Controle financeiro da família. Grupos (ex.: FinPorto), contas com titular (ex.
 
 1. Crie um projeto no [Supabase](https://supabase.com) (o plano gratuito basta).
 2. Aplique as migrações de `supabase/migrations/`, de uma das formas:
-   - Pelo CLI: `npx supabase login`, `npx supabase link --project-ref <ref>` e `npx supabase db push`.
+   - Pelo CLI: `npx supabase login`, `npx supabase link --project-ref <ref>` e `npx supabase db push --remote`.
    - Ou cole os dois arquivos no SQL Editor, nesta ordem: `20261103120000_schema.sql` e depois `20261103120100_cron.sql`.
 3. Em **Authentication > URL Configuration**:
    - Site URL: `https://<usuario>.github.io/<repositorio>/`

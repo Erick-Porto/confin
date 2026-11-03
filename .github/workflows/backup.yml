@@ -28,7 +28,7 @@ jobs:
 
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 3.0.0
 
       - name: Vincular ao projeto
         run: supabase link --project-ref "$SUPABASE_PROJECT_REF"
@@ -36,8 +36,8 @@ jobs:
       - name: Gerar dump (esquema e dados)
         run: |
           mkdir backup
-          supabase db dump --linked -f backup/schema.sql
-          supabase db dump --linked --data-only -f backup/data.sql
+          supabase db dump --remote --password "$SUPABASE_DB_PASSWORD" -f backup/schema.sql
+          supabase db dump --remote --password "$SUPABASE_DB_PASSWORD" --data-only -f backup/data.sql
 
       # Criptografado porque artifacts de repositório público podem ser baixados por qualquer pessoa.
       # Os dados são financeiros: a senha (BACKUP_PASSPHRASE) fica só nos secrets e em local seguro.
