@@ -1,0 +1,60 @@
+name: Backup semanal (Supabase)
+
+on:
+  # Domingos às 02:00 de Brasília.
+  schedule:
+    - cron: '0 5 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Um backup por vez; o que já está rodando não é cancelado.
+concurrency:
+  group: backup
+  cancel-in-progress: false
+
+env:
+  SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+  SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+  SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+  BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Vincular ao projeto
+        run: supabase link --project-ref "$SUPABASE_PROJECT_REF"
+
+      - name: Gerar dump (esquema e dados)
+        run: |
+          mkdir backup
+          supabase db dump --linked -f backup/schema.sql
+          supabase db dump --linked --data-only -f backup/data.sql
+
+      # Criptografado porque artifacts de repositório público podem ser baixados por qualquer pessoa.
+      # Os dados são financeiros: a senha (BACKUP_PASSPHRASE) fica só nos secrets e em local seguro.
+      - name: Compactar e criptografar
+        run: |
+          tar -czf backup.tar.gz backup
+          # A senha entra pela entrada padrão, sem aparecer na lista de processos.
+          printf '%s' "$BACKUP_PASSPHRASE" | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 \
+            --symmetric --cipher-algo AES256 \
+            -o "confin-backup-$(date +%F).tar.gz.gpg" backup.tar.gz
+          # Remove os arquivos sem criptografia.
+          rm -rf backup backup.tar.gz
+
+      - name: Guardar backup criptografado
+        uses: actions/upload-artifact@v4
+        with:
+          name: confin-backup-${{ github.run_id }}
+          path: confin-backup-*.tar.gz.gpg
+          retention-days: 90
+          if-no-files-found: error

@@ -1,0 +1,100 @@
+# Contrato técnico do Confin
+
+Referência única para quem implementa telas. Proposta funcional: https://claude.ai/artifact/LcnFdG9WKK3UshrGAUJSmq
+
+## Stack
+
+- React 19 + TypeScript + Vite 7, SPA estática com `HashRouter` (rotas em `#/...`).
+- Tailwind CSS 4 (tokens em `src/index.css`), ícones `lucide-react` 1.x, gráficos `recharts` 3.
+- Dados: `@supabase/supabase-js` 2 (cliente sem tipos gerados) + `@tanstack/react-query` 5.
+- Datas: `date-fns` 4 com `ptBR` de `date-fns/locale`.
+- Não adicione dependências novas.
+
+## Estrutura
+
+```
+src/
+  types.ts                  tipos de domínio (espelham o SQL)
+  lib/                      supabase, format, period, rules, errors, icons, accounts, categories
+  context/                  AuthContext (sessão), GroupContext (grupo ativo), UIContext (tema, ocultar valores, folha de lançamento, toast)
+  hooks/queries.ts          leituras compartilhadas + chaves do React Query + useInvalidateFinance
+  components/ui/            Button, Card, Field/Input/Select/Textarea/Switch, Sheet, ConfirmDialog, Money/TxAmount, PageHeader, EmptyState, Segmented, ListItem, ColorDot, Spinner/Skeleton
+  components/               TransactionRow, PeriodSwitcher (+ usePeriodParam, useMonthStartDay), layout/AppLayout
+  features/transactions/    mutations.ts (gravar, parcelar, excluir, desfazer, confirmar) + TransactionSheet
+  pages/                    uma tela por arquivo (export default)
+supabase/migrations/        esquema, RLS, funções e pg_cron
+```
+
+## Regras de negócio (não reimplemente: use `src/lib/rules.ts`)
+
+- Valores em centavos inteiros e positivos; o `type` (`income`, `expense`, `transfer`) dá o sinal.
+- **Efetivado** = `status = 'posted'` e `date <= hoje`. Só efetivados entram em saldo e totais.
+- **Agendado** = `posted` com data futura (parcelas futuras). Efetiva sozinho na data.
+- **Previsto** = `status = 'planned'` (gerado por recorrência). Usuário confirma com `useConfirmTransaction`.
+- Transferência é um lançamento só (`account_id` → `to_account_id`), sem categoria, fora de entradas/saídas/% por categoria.
+- % por categoria = saídas efetivadas da categoria no período ÷ total de saídas efetivadas do período. Subcategorias somam na categoria principal (`topLevelId`).
+- Saldo de conta vem da view `account_balances` (já mesclado em `useAccounts()` como `balance_cents`).
+- Cartão de crédito é uma conta `credit_card` (com `closing_day` e `due_day`). Compra = saída no cartão; pagamento da fatura = transferência de outra conta para o cartão. Saldo negativo = fatura em aberto.
+- Aporte em investimento = transferência para conta `investment`.
+- Mês financeiro começa em `currentGroup.month_start_day` (1 a 28). Use `getPeriod`/`shiftPeriod`/`lastPeriods` de `lib/period.ts` e `useMonthStartDay()`; nunca assuma mês do calendário.
+- Datas sempre como `YYYY-MM-DD` locais: `todayISO()`, `toISODate()`, `parseISODate()` de `lib/format.ts`. Nunca `new Date().toISOString().slice(0, 10)` (dá o dia errado à noite no Brasil).
+- Tudo do grupo é visível e editável por todos os membros. Gastos pessoais = outro grupo (ex.: "Meus gastos").
+
+## Banco (Supabase)
+
+- Tabelas: `profiles`, `groups`, `group_members`, `group_invites`, `accounts`, `categories`, `recurrences`, `transactions`, `audit_log`; view `account_balances`.
+- RPCs: `create_group(p_name) → uuid`, `create_invite(p_group) → code`, `accept_invite(p_code) → group_id`, `generate_recurrences(p_group, p_horizon_days) → int` (helper `generateRecurrences(groupId)` em `hooks/queries.ts`).
+- `created_by`, `updated_by` e datas são preenchidos pelo banco. Não envie esses campos.
+- Grupos só são criados por `create_group`; membros só entram por `create_group`/`accept_invite`.
+- Excluir conta com lançamentos falha (FK): ofereça arquivar (`archived = true`). Idem categoria (exclusão deixa os lançamentos sem categoria; prefira arquivar).
+- Ao criar/editar/pausar recorrência, o banco remove os previstos futuros dela; depois chame `generateRecurrences(groupId)` e `useInvalidateFinance()`.
+- Erros: mostre `errorMessage(err)` de `lib/errors.ts` num `toast(msg, { tone: 'error' })`.
+
+## Dados no app
+
+- Leituras: `useAccounts`, `useCategories`, `useMembers`, `useInvites`, `useTransactions(filters)`, `useRecurrences` (`hooks/queries.ts`).
+- Depois de escrever em lançamentos, contas ou recorrências: `await useInvalidateFinance()()`. Para categorias: `queryClient.invalidateQueries({ queryKey: ['categories'] })`; membros: `['members']`; convites: `['invites']`.
+- Grupo ativo: `useGroup()` (`currentGroup`, `isOwner`, `memberships`, `setCurrentGroupId`, `refresh`) e `useGroupId()` dentro das telas logadas.
+- Rótulo de conta: `accountLabel(account, members)` → "Erick - Nubank" (titular nulo = "Conjunta").
+
+## Navegação e parâmetros entre telas
+
+| Rota | Parâmetros |
+| --- | --- |
+| `/` | Início (painel) |
+| `/extrato` | `?periodo=YYYY-MM-DD` (início do período, via `usePeriodParam`), `?conta=<id>`, `?categoria=<id>` (inclui subcategorias), `?tipo=income\|expense\|transfer`, `?situacao=previsto`, `?membro=<userId>` (titular da conta) |
+| `/relatorios` | `?periodo=YYYY-MM-DD` |
+| `/mais` | Grupo, membros, convites, mês financeiro, tema, perfil, sair |
+| `/contas` | Lista e cadastro de contas |
+| `/contas/:id/fatura` | Fatura do cartão; `?fatura=YYYY-MM-DD` (data de fechamento) opcional |
+| `/categorias` | Lista, cadastro e orçamento mensal |
+| `/recorrencias` | `?nova=1` abre o formulário de nova recorrência |
+| `/onboarding` | Criar grupo ou entrar com código; `?novo=1` quando já tem grupo e quer outro |
+| `/convite/:code` | Guarda o código em `localStorage['confin.pendingInvite']` e segue para cadastro ou onboarding |
+| `/entrar`, `/cadastro`, `/esqueci-senha`, `/redefinir-senha` | Acesso |
+
+- Nova transação de qualquer tela: `useUI().openTransactionSheet({ defaults })`; editar: `openTransactionSheet({ transaction })`.
+- Pagar fatura: `openTransactionSheet({ defaults: { type: 'transfer', to_account_id: cardId, amount_cents, date, description } })`.
+
+## Interface
+
+- Mobile first: largura útil até `max-w-lg` (o `AppLayout` já centraliza e reserva espaço para a barra inferior).
+- Cores só pelos tokens: `bg-bg`, `bg-surface`, `bg-surface-2`, `border-line`, `text-fg`, `text-muted`, `brand-50..900`, `text-income`, `text-expense`, `text-transfer`, `text-invest`. Sempre funcionar no modo escuro.
+- Valores sempre por `<Money>`/`<TxAmount>`/`useMoneyText()` (respeitam "ocultar valores").
+- Textos de interface e comentários em português do Brasil. Formato R$ 1.234,56 e dd/mm/aaaa.
+- Alvos de toque com pelo menos 44 px. Estados de carregando (`Skeleton`), vazio (`EmptyState`) e erro em toda tela.
+- Ícones: confira que o nome existe em `node_modules/lucide-react/dist/lucide-react.d.ts` (`declare const Nome:`). Na 1.x vários apelidos sumiram (use `Trash`, `Funnel`, `House`, `CirclePlus`, `Ellipsis`).
+- Classes do Tailwind sempre escritas por inteiro (nada de `text-${cor}`).
+
+## Donos dos arquivos
+
+| Frente | Arquivos |
+| --- | --- |
+| Fundação (Opus) | tudo fora das linhas abaixo |
+| Acesso e cadastros | `src/pages/auth/*`, `src/pages/onboarding/*`, `src/pages/More.tsx`, `src/pages/Accounts.tsx`, `src/pages/Categories.tsx`, `src/features/accounts/**`, `src/features/categories/**`, `src/features/groups/**` |
+| Lançamentos | `src/features/transactions/**` (exceto mudar assinaturas de `mutations.ts`), `src/pages/Statement.tsx` |
+| Painel e relatórios | `src/pages/Home.tsx`, `src/pages/Reports.tsx`, `src/features/dashboard/**`, `src/components/charts/**` |
+| Recorrências e cartão | `src/pages/Recurrences.tsx`, `src/pages/CardStatement.tsx`, `src/features/recurrences/**`, `src/features/cards/**`, `src/lib/card.ts` |
+| Infra | `.github/workflows/*`, `README.md` |
+
+Precisa mudar um arquivo compartilhado? Não mude: descreva a mudança no relatório final.

@@ -1,0 +1,37 @@
+name: Migrar banco (Supabase)
+
+on:
+  push:
+    branches: [main]
+    paths: ['supabase/migrations/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Migrações rodam em fila, nunca em paralelo, e não são canceladas no meio.
+concurrency:
+  group: db-migrate
+  cancel-in-progress: false
+
+env:
+  SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+  SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+  SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Vincular ao projeto
+        run: supabase link --project-ref "$SUPABASE_PROJECT_REF"
+
+      # Aplica só as migrações que ainda não estão no banco.
+      - name: Aplicar migrações
+        run: supabase db push

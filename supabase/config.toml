@@ -1,0 +1,3 @@
+# Configuração mínima para o Supabase CLI (supabase link / supabase db push).
+# As configurações de Auth de produção ficam no painel do Supabase (ver README).
+project_id = "confin"
