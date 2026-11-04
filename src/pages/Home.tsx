@@ -5,7 +5,9 @@ import { Eye, EyeOff, Plus } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useGroup } from '@/context/GroupContext';
 import { useUI } from '@/context/UIContext';
-import { useAccounts, useCategories, useMembers, useTransactions } from '@/hooks/queries';
+import { useAccounts, useCategories, useMembers, usePlanBlocks, useTransactions } from '@/hooks/queries';
+import { PlanBar } from '@/features/planning/PlanBar';
+import { planAlerts, planSummary } from '@/features/planning/plan';
 import { useConfirmTransaction } from '@/features/transactions/mutations';
 import { useMonthStartDay } from '@/components/PeriodSwitcher';
 import { TransactionRow } from '@/components/TransactionRow';
@@ -62,6 +64,12 @@ export default function Home() {
   const donut = useMemo(() => topWithOthers(slices, 5), [slices]);
   const totalExpense = slices.reduce((s, x) => s + x.cents, 0);
   const budgets = useMemo(() => budgetStatuses(periodTxs, categories, today), [periodTxs, categories, today]);
+
+  const planQ = usePlanBlocks();
+  const planBlocks = useMemo(() => planQ.data ?? [], [planQ.data]);
+  const hasPlan = planBlocks.length > 0;
+  const plan = useMemo(() => planSummary(periodTxs, planBlocks, categories, accounts, today), [periodTxs, planBlocks, categories, accounts, today]);
+  const planWarnings = useMemo(() => planAlerts(plan), [plan]);
 
   const pending = useMemo(
     () =>
@@ -276,6 +284,58 @@ export default function Home() {
                     ))}
                   </ul>
                 </Card>
+              )}
+
+              {!planQ.isLoading && !planQ.isError && (
+                !hasPlan ? (
+                  <Card className="flex items-center justify-between gap-3">
+                    <p className="text-sm text-muted">Divida sua renda em blocos, como no 50/30/20</p>
+                    <Link to="/planejamento?editar=1" className="flex min-h-11 shrink-0 items-center text-sm font-semibold text-brand-700 dark:text-brand-300">
+                      Montar plano
+                    </Link>
+                  </Card>
+                ) : plan.income > 0 ? (
+                  <Card>
+                    <CardHeader
+                      title="Plano do mês"
+                      action={
+                        <Link to="/planejamento" className="flex min-h-11 items-center text-sm font-semibold text-brand-700 dark:text-brand-300">
+                          Ver plano
+                        </Link>
+                      }
+                    />
+                    {planWarnings.length > 0 && (
+                      <ul className="mb-3 flex flex-col gap-1 text-sm">
+                        {planWarnings.map((s) => (
+                          <li key={s.block.id} className={s.level === 'over' ? 'text-expense' : 'text-amber-600 dark:text-amber-400'}>
+                            {s.level === 'over' ? (
+                              <>
+                                {s.block.name} passou <Money cents={s.done - s.planned} />
+                              </>
+                            ) : (
+                              `${s.block.name}: ${Math.round(s.ratio * 100)}% do limite`
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    <ul className="flex flex-col gap-3">
+                      {plan.blocks.map((s) => (
+                        <li key={s.block.id}>
+                          <div className="flex items-baseline justify-between gap-2 text-sm">
+                            <span className="truncate font-medium">{s.block.name}</span>
+                            <span className="shrink-0 text-xs text-muted">
+                              <Money cents={s.done} /> de <Money cents={s.planned} />
+                            </span>
+                          </div>
+                          <div className="mt-1.5">
+                            <PlanBar status={s} thin />
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </Card>
+                ) : null
               )}
 
               {pending.length > 0 && (

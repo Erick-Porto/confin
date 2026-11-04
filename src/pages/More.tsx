@@ -9,6 +9,7 @@ import {
   Crown,
   LogOut,
   Plus,
+  Target,
   Repeat,
   Share2,
   Tag,
@@ -474,6 +475,12 @@ export default function More() {
           onClick={() => navigate('/categorias')}
           leading={<Tag size={20} className="text-muted" />}
           title="Categorias"
+          trailing={<Chevron />}
+        />
+        <ListItem
+          onClick={() => navigate('/planejamento')}
+          leading={<Target size={20} className="text-muted" />}
+          title="Planejamento"
           trailing={<Chevron />}
         />
         <ListItem

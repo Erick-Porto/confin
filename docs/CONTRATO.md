@@ -42,8 +42,8 @@ supabase/migrations/        esquema, RLS, funções e pg_cron
 
 ## Banco (Supabase)
 
-- Tabelas: `profiles`, `groups`, `group_members`, `group_invites`, `accounts`, `categories`, `recurrences`, `transactions`, `audit_log`; view `account_balances`.
-- RPCs: `create_group(p_name) → uuid`, `create_invite(p_group) → code`, `accept_invite(p_code) → group_id`, `generate_recurrences(p_group, p_horizon_days) → int` (helper `generateRecurrences(groupId)` em `hooks/queries.ts`).
+- Tabelas: `profiles`, `groups`, `group_members`, `group_invites`, `accounts`, `categories`, `recurrences`, `transactions`, `audit_log`, `plan_blocks`; view `account_balances`.
+- RPCs: `create_group(p_name) → uuid`, `create_invite(p_group) → code`, `accept_invite(p_code) → group_id`, `generate_recurrences(p_group, p_horizon_days) → int` (helper `generateRecurrences(groupId)` em `hooks/queries.ts`), `save_plan(p_group, p_blocks, p_categories)` (use `useSavePlan()`).
 - `created_by`, `updated_by` e datas são preenchidos pelo banco. Não envie esses campos.
 - Grupos só são criados por `create_group`; membros só entram por `create_group`/`accept_invite`.
 - Excluir conta com lançamentos falha (FK): ofereça arquivar (`archived = true`). Idem categoria (exclusão deixa os lançamentos sem categoria; prefira arquivar).
@@ -52,7 +52,7 @@ supabase/migrations/        esquema, RLS, funções e pg_cron
 
 ## Dados no app
 
-- Leituras: `useAccounts`, `useCategories`, `useMembers`, `useInvites`, `useTransactions(filters)`, `useRecurrences` (`hooks/queries.ts`).
+- Leituras: `useAccounts`, `useCategories`, `useMembers`, `useInvites`, `useTransactions(filters)`, `useRecurrences`, `usePlanBlocks` (`hooks/queries.ts`).
 - Depois de escrever em lançamentos, contas ou recorrências: `await useInvalidateFinance()()`. Para categorias: `queryClient.invalidateQueries({ queryKey: ['categories'] })`; membros: `['members']`; convites: `['invites']`.
 - Grupo ativo: `useGroup()` (`currentGroup`, `isOwner`, `memberships`, `setCurrentGroupId`, `refresh`) e `useGroupId()` dentro das telas logadas.
 - Rótulo de conta: `accountLabel(account, members)` → "Erick - Nubank" (titular nulo = "Conjunta").
@@ -64,6 +64,7 @@ supabase/migrations/        esquema, RLS, funções e pg_cron
 | `/` | Início (painel) |
 | `/extrato` | `?periodo=YYYY-MM-DD` (início do período, via `usePeriodParam`), `?conta=<id>`, `?categoria=<id>` (inclui subcategorias), `?tipo=income\|expense\|transfer`, `?situacao=previsto`, `?membro=<userId>` (titular da conta) |
 | `/relatorios` | `?periodo=YYYY-MM-DD` |
+| `/planejamento` | `?periodo=YYYY-MM-DD`; `?editar=1` abre o editor do plano |
 | `/mais` | Grupo, membros, convites, mês financeiro, tema, perfil, sair |
 | `/contas` | Lista e cadastro de contas |
 | `/contas/:id/fatura` | Fatura do cartão; `?fatura=YYYY-MM-DD` (data de fechamento) opcional |
@@ -75,6 +76,17 @@ supabase/migrations/        esquema, RLS, funções e pg_cron
 
 - Nova transação de qualquer tela: `useUI().openTransactionSheet({ defaults })`; editar: `openTransactionSheet({ transaction })`.
 - Pagar fatura: `openTransactionSheet({ defaults: { type: 'transfer', to_account_id: cardId, amount_cents, date, description } })`.
+
+## Planejamento (Fase 3)
+
+Regras e cálculos em `src/features/planning/plan.ts` (não reimplemente):
+- O plano do grupo é uma lista de blocos (`plan_blocks`) que somam 100% da renda do período. Bloco `spend` é limite de gastos; `invest` é meta de aporte.
+- Cada categoria de saída de primeiro nível aponta para um bloco (`categories.plan_block_id`); subcategorias contam pela pai. Use `plannableCategories()`.
+- Renda do período = entradas efetivadas + agendadas + previstas, fora contas de investimento. Bloco planejado = renda × percentual.
+- Aportes líquidos (transferências para contas de investimento menos resgates) contam no primeiro bloco `invest`.
+- `planSummary(txs, blocks, categories, accounts)` dá planejado, feito (efetivado), a caminho (agendado + previsto), nível (`ok | warning | over | reached`) e gastos por categoria de cada bloco, além do aporte sugerido do período (`suggestedInvest`) e do já aportado (`investedDone`).
+- Alertas: `planAlerts(summary)` (blocos de gasto a partir de 80% ou estourados; vazio sem renda).
+- Editor: rascunho `PlanDraft` criado por `draftFromTemplate` (modelos em `PLAN_TEMPLATES`), `draftBlank` ou `draftFromPlan`; `validateDraft` diz o que impede salvar; `useSavePlan()` grava tudo de uma vez (rascunho sem blocos remove o plano). Depois de salvar, as listas de blocos e categorias já são atualizadas pela mutação.
 
 ## Interface
 
@@ -95,6 +107,7 @@ supabase/migrations/        esquema, RLS, funções e pg_cron
 | Lançamentos | `src/features/transactions/**` (exceto mudar assinaturas de `mutations.ts`), `src/pages/Statement.tsx` |
 | Painel e relatórios | `src/pages/Home.tsx`, `src/pages/Reports.tsx`, `src/features/dashboard/**`, `src/components/charts/**` |
 | Recorrências e cartão | `src/pages/Recurrences.tsx`, `src/pages/CardStatement.tsx`, `src/features/recurrences/**`, `src/features/cards/**`, `src/lib/card.ts` |
+| Planejamento | `src/pages/Planning.tsx`, `src/features/planning/**` (exceto mudar `plan.ts` e `mutations.ts`) |
 | Infra | `.github/workflows/*`, `README.md` |
 
 Precisa mudar um arquivo compartilhado? Não mude: descreva a mudança no relatório final.

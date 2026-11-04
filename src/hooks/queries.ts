@@ -9,6 +9,7 @@ import type {
   Category,
   Invite,
   Member,
+  PlanBlock,
   Recurrence,
   Transaction,
   TransactionFilters,
@@ -25,6 +26,7 @@ export const qk = {
   invites: (groupId: string) => ['invites', groupId] as const,
   transactions: (groupId: string, filters: TransactionFilters) => ['transactions', groupId, filters] as const,
   recurrences: (groupId: string) => ['recurrences', groupId] as const,
+  planBlocks: (groupId: string) => ['plan-blocks', groupId] as const,
 };
 
 function useCurrentGroupId(): string | null {
@@ -75,6 +77,24 @@ export function useCategories() {
         .order('name');
       if (error) throw error;
       return data as Category[];
+    },
+  });
+}
+
+/** Blocos do plano financeiro do grupo, na ordem de exibição. Lista vazia = grupo sem plano. */
+export function usePlanBlocks() {
+  const groupId = useCurrentGroupId();
+  return useQuery({
+    queryKey: qk.planBlocks(groupId ?? ''),
+    enabled: !!groupId,
+    queryFn: async (): Promise<PlanBlock[]> => {
+      const { data, error } = await supabase
+        .from('plan_blocks')
+        .select('id, group_id, name, kind, percent, color, sort_order')
+        .eq('group_id', groupId!)
+        .order('sort_order');
+      if (error) throw error;
+      return data as PlanBlock[];
     },
   });
 }

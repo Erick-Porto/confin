@@ -91,9 +91,26 @@ export interface Category {
   color: string;
   /** Orçamento mensal (Fase 2). Só faz sentido em categorias de saída. */
   monthly_budget_cents: number | null;
+  /** Bloco do plano (Fase 3). Só em categorias de saída de primeiro nível; subcategorias seguem a pai. */
+  plan_block_id: string | null;
   archived: boolean;
   sort_order: number;
   created_at: string;
+}
+
+export type PlanBlockKind = 'spend' | 'invest';
+
+/** Bloco do plano financeiro (Fase 3). Os blocos de um grupo somam 100% da renda. */
+export interface PlanBlock {
+  id: string;
+  group_id: string;
+  name: string;
+  /** spend = limite de gastos; invest = meta de aporte. */
+  kind: PlanBlockKind;
+  /** Inteiro de 0 a 100. */
+  percent: number;
+  color: string;
+  sort_order: number;
 }
 
 export interface Transaction {
