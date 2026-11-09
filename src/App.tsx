@@ -16,6 +16,8 @@ const Home = lazy(() => import('@/pages/Home'));
 const Statement = lazy(() => import('@/pages/Statement'));
 const Reports = lazy(() => import('@/pages/Reports'));
 const Planning = lazy(() => import('@/pages/Planning'));
+const Agenda = lazy(() => import('@/pages/Agenda'));
+const Forecast = lazy(() => import('@/pages/Forecast'));
 const Investments = lazy(() => import('@/pages/Investments'));
 const InvestmentDetail = lazy(() => import('@/pages/InvestmentDetail'));
 const More = lazy(() => import('@/pages/More'));
@@ -86,6 +88,8 @@ export default function App() {
           <Route path="extrato" element={<Statement />} />
           <Route path="relatorios" element={<Reports />} />
           <Route path="planejamento" element={<Planning />} />
+          <Route path="agenda" element={<Agenda />} />
+          <Route path="previsao" element={<Forecast />} />
           <Route path="investimentos" element={<Investments />} />
           <Route path="investimentos/:id" element={<InvestmentDetail />} />
           <Route path="mais" element={<More />} />

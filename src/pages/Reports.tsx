@@ -11,6 +11,7 @@ import { NetWorthCard } from '@/features/investments/NetWorthCard';
 import { Card, EmptyState, Money, PageHeader, Segmented, Skeleton } from '@/components/ui';
 import { errorMessage } from '@/lib/errors';
 import { formatPercent, parseISODate } from '@/lib/format';
+import { isEffective } from '@/lib/rules';
 import { CategoryIcon } from '@/lib/icons';
 import { lastPeriods } from '@/lib/period';
 import {
@@ -154,6 +155,14 @@ export default function Reports() {
   const total = slices.reduce((s, x) => s + x.cents, 0);
   const budgets = useMemo(() => budgetStatuses(txs, categories), [txs, categories]);
   const rows = useMemo(() => totalsByPeriod(txs, periods), [txs, periods]);
+  const tagTotals = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const t of txs) {
+      if (t.type !== 'expense' || !isEffective(t)) continue;
+      for (const tag of t.tags ?? []) map.set(tag, (map.get(tag) ?? 0) + t.amount_cents);
+    }
+    return [...map.entries()].map(([tag, cents]) => ({ tag, cents })).sort((a, b) => b.cents - a.cents);
+  }, [txs]);
   const owners = useMemo(() => expensesByOwner(txs, accounts, members), [txs, accounts, members]);
   const ownersTotal = owners.reduce((s, o) => s + o.cents, 0);
 
@@ -226,6 +235,28 @@ export default function Reports() {
                     })}
                   </ul>
                 </Card>
+                {kind === 'expense' && tagTotals.length > 0 && (
+                  <Card>
+                    <h2 className="mb-1 text-sm font-semibold">Por tag</h2>
+                    <ul className="divide-y divide-line">
+                      {tagTotals.map((t) => (
+                        <li key={t.tag}>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              navigate(`/extrato?periodo=${period.key}&tag=${encodeURIComponent(t.tag)}&tipo=expense`)
+                            }
+                            className="flex min-h-11 w-full items-center justify-between gap-2 rounded-xl px-1 text-left text-sm hover:bg-surface-2"
+                          >
+                            <span className="min-w-0 flex-1 truncate">#{t.tag}</span>
+                            <Money cents={t.cents} className="font-semibold" />
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="mt-2 text-xs text-muted">Um lançamento com várias tags conta em cada uma delas.</p>
+                  </Card>
+                )}
               </>
             )}
           </>

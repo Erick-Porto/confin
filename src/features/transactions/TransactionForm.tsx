@@ -22,6 +22,7 @@ import {
 import type { Transaction, TransactionInput, TxStatus, TxType } from '@/types';
 import { AccountChips } from './AccountChips';
 import { AmountInput } from './AmountInput';
+import { TagInput } from '@/features/tags/TagInput';
 import { CategoryPicker } from './CategoryPicker';
 import {
   useCreateInstallments,
@@ -134,6 +135,7 @@ export default function TransactionForm({
 
   const [date, setDate] = useState<string>(transaction?.date ?? defaults?.date ?? todayISO());
   const [description, setDescription] = useState(transaction?.description ?? defaults?.description ?? '');
+  const [tags, setTags] = useState<string[]>(transaction?.tags ?? []);
   const [notes, setNotes] = useState(transaction?.notes ?? '');
   const [showNotes, setShowNotes] = useState(!!transaction?.notes);
   const [paid, setPaid] = useState<boolean>((transaction?.status ?? defaults?.status ?? 'posted') === 'posted');
@@ -198,6 +200,7 @@ export default function TransactionForm({
       date,
       description: description.trim(),
       notes: notes.trim() ? notes.trim() : null,
+      tags,
       account_id: accountId,
       to_account_id: type === 'transfer' ? toAccountId : null,
       category_id: type === 'transfer' ? null : categoryId,
@@ -434,6 +437,8 @@ export default function TransactionForm({
               />
             )}
           </Field>
+
+          <Field label="Tags">{(id) => <TagInput id={id} value={tags} onChange={setTags} />}</Field>
 
           {showNotes ? (
             <Field label="Observação">

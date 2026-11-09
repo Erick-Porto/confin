@@ -143,9 +143,9 @@ export default function Home() {
               <Money cents={total} />
             </p>
             {activeAccounts.length > 0 && (
-              <p className="mt-3 text-sm text-white/80">
-                Previsto no fim do mês: <Money cents={forecast} className="font-semibold text-white" />
-              </p>
+              <Link to="/previsao" className="mt-1 flex min-h-[44px] items-center text-sm text-white/80">
+                Previsto no fim do mês: <Money cents={forecast} className="ml-1 font-semibold text-white" />
+              </Link>
             )}
           </section>
 
@@ -343,7 +343,7 @@ export default function Home() {
                   <CardHeader
                     title="Pendentes e próximos"
                     action={
-                      <Link to="/extrato?situacao=previsto" className="flex min-h-[44px] items-center text-sm font-medium text-brand-700 dark:text-brand-400">
+                      <Link to="/agenda" className="flex min-h-[44px] items-center text-sm font-medium text-brand-700 dark:text-brand-400">
                         Ver todos
                       </Link>
                     }

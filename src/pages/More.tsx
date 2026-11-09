@@ -5,8 +5,11 @@ import { format } from 'date-fns';
 import {
   Check,
   ChevronRight,
+  CalendarClock,
   Copy,
   Crown,
+  Download,
+  LineChart,
   LogOut,
   Plus,
   Target,
@@ -21,10 +24,12 @@ import {
 import { useAuth } from '@/context/AuthContext';
 import { useGroup } from '@/context/GroupContext';
 import { useUI } from '@/context/UIContext';
-import { useInvites, useMembers } from '@/hooks/queries';
+import { useAccounts, useCategories, useInvites, useMembers } from '@/hooks/queries';
 import { supabase, inviteUrl } from '@/lib/supabase';
 import { errorMessage } from '@/lib/errors';
-import { firstName } from '@/lib/format';
+import { firstName, todayISO } from '@/lib/format';
+import { downloadCsv, fetchAllTransactions, transactionsToCsv } from '@/features/export/csv';
+import { NotificationSettings } from '@/features/notifications/NotificationSettings';
 import {
   Button,
   Card,
@@ -71,6 +76,8 @@ export default function More() {
   const membersQ = useMembers();
   const invitesQ = useInvites(isOwner);
   const members = membersQ.data ?? [];
+  const accountsQ = useAccounts();
+  const categoriesQ = useCategories();
 
   // Perfil
   const [profileOpen, setProfileOpen] = useState(false);
@@ -96,6 +103,10 @@ export default function More() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleteText, setDeleteText] = useState('');
   const [deleting, setDeleting] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [confirmAccount, setConfirmAccount] = useState(false);
+  const [accountText, setAccountText] = useState('');
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   if (!currentGroup || !user) {
     return (
@@ -259,7 +270,7 @@ export default function More() {
   async function deleteGroup() {
     setDeleting(true);
     try {
-      const { error } = await supabase.from('groups').delete().eq('id', groupId);
+      const { error } = await supabase.rpc('delete_group', { p_group: groupId });
       if (error) throw error;
       setConfirmDelete(false);
       await refresh();
@@ -269,6 +280,37 @@ export default function More() {
       toast(errorMessage(err), { tone: 'error' });
     } finally {
       setDeleting(false);
+    }
+  }
+
+  async function exportCsv() {
+    setExporting(true);
+    try {
+      const txs = await fetchAllTransactions(groupId);
+      const csv = transactionsToCsv(txs, {
+        accounts: accountsQ.data ?? [],
+        categories: categoriesQ.data ?? [],
+        members,
+      });
+      downloadCsv(`confin-${currentGroup?.name ?? 'grupo'}-${todayISO()}.csv`, csv);
+    } catch (err) {
+      toast(errorMessage(err), { tone: 'error' });
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  async function deleteAccount() {
+    setDeletingAccount(true);
+    try {
+      const { error } = await supabase.rpc('delete_my_account');
+      if (error) throw error;
+      setConfirmAccount(false);
+      await signOut();
+    } catch (err) {
+      toast(errorMessage(err), { tone: 'error' });
+    } finally {
+      setDeletingAccount(false);
     }
   }
 
@@ -485,6 +527,18 @@ export default function More() {
           trailing={<Chevron />}
         />
         <ListItem
+          onClick={() => navigate('/agenda')}
+          leading={<CalendarClock size={20} className="text-muted" />}
+          title="Contas a pagar e receber"
+          trailing={<Chevron />}
+        />
+        <ListItem
+          onClick={() => navigate('/previsao')}
+          leading={<LineChart size={20} className="text-muted" />}
+          title="Previsão de saldo"
+          trailing={<Chevron />}
+        />
+        <ListItem
           onClick={() => navigate('/investimentos')}
           leading={<TrendingUp size={20} className="text-muted" />}
           title="Investimentos"
@@ -495,6 +549,22 @@ export default function More() {
           leading={<Repeat size={20} className="text-muted" />}
           title="Recorrências"
           trailing={<Chevron />}
+        />
+      </Card>
+
+      {/* Notificações */}
+      <SectionTitle>Notificações</SectionTitle>
+      <Card>
+        <NotificationSettings />
+      </Card>
+
+      {/* Exportar */}
+      <SectionTitle>Dados</SectionTitle>
+      <Card className="py-2">
+        <ListItem
+          onClick={exporting ? undefined : () => void exportCsv()}
+          leading={<Download size={20} className="text-muted" />}
+          title={exporting ? 'Exportando...' : 'Exportar todos os lançamentos (CSV)'}
         />
       </Card>
 
@@ -531,6 +601,14 @@ export default function More() {
             title={<span className="text-expense">Excluir grupo</span>}
           />
         )}
+        <ListItem
+          onClick={() => {
+            setAccountText('');
+            setConfirmAccount(true);
+          }}
+          leading={<Trash size={20} className="text-expense" />}
+          title={<span className="text-expense">Excluir minha conta</span>}
+        />
       </Card>
 
       <Button variant="outline" block className="mt-6" icon={<LogOut size={18} />} onClick={() => void signOut()}>
@@ -653,6 +731,40 @@ export default function More() {
           </p>
           <Field label={`Digite "${currentGroup.name}" para confirmar`}>
             {(id) => <Input id={id} value={deleteText} onChange={(e) => setDeleteText(e.target.value)} autoComplete="off" />}
+          </Field>
+        </div>
+      </Sheet>
+
+      {/* Excluir minha conta */}
+      <Sheet
+        open={confirmAccount}
+        onClose={() => setConfirmAccount(false)}
+        title="Excluir minha conta?"
+        footer={
+          <div className="flex gap-3">
+            <Button variant="secondary" block onClick={() => setConfirmAccount(false)} disabled={deletingAccount}>
+              Cancelar
+            </Button>
+            <Button
+              variant="danger"
+              block
+              loading={deletingAccount}
+              disabled={accountText.trim() !== 'EXCLUIR'}
+              onClick={() => void deleteAccount()}
+            >
+              Excluir conta
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-3">
+          <p className="text-sm text-muted">
+            Os grupos em que você está sozinho são excluídos com tudo dentro. Nos grupos compartilhados, você sai, suas contas
+            viram "Conjunta" e, se você era o único dono, o membro mais antigo passa a ser dono. Isso não pode ser desfeito.
+          </p>
+          <p className="text-sm text-muted">Sugestão: exporte os lançamentos em CSV antes de continuar.</p>
+          <Field label='Digite "EXCLUIR" para confirmar'>
+            {(id) => <Input id={id} value={accountText} onChange={(e) => setAccountText(e.target.value)} autoComplete="off" />}
           </Field>
         </div>
       </Sheet>

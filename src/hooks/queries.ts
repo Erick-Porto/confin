@@ -34,6 +34,7 @@ export const qk = {
   investmentValues: (groupId: string) => ['investment-values', groupId] as const,
   investmentFlows: (groupId: string) => ['investment-flows', groupId] as const,
   balancesAt: (groupId: string, dates: string[]) => ['balances-at', groupId, dates.join(',')] as const,
+  tags: (groupId: string) => ['tags', groupId] as const,
 };
 
 function useCurrentGroupId(): string | null {
@@ -178,6 +179,20 @@ export function useAccountBalancesAt(dates: string[]) {
   });
 }
 
+/** Tags já usadas no grupo, das mais usadas para as menos (sugestões e filtros). */
+export function useGroupTags() {
+  const groupId = useCurrentGroupId();
+  return useQuery({
+    queryKey: qk.tags(groupId ?? ''),
+    enabled: !!groupId,
+    queryFn: async (): Promise<Array<{ tag: string; uses: number }>> => {
+      const { data, error } = await supabase.rpc('group_tags', { p_group: groupId });
+      if (error) throw error;
+      return (data as Array<{ tag: string; uses: number }>).map((r) => ({ tag: r.tag, uses: Number(r.uses) }));
+    },
+  });
+}
+
 /** Membros do grupo com perfil (nome). */
 export function useMembers() {
   const groupId = useCurrentGroupId();
@@ -238,6 +253,7 @@ export function useTransactions(filters: TransactionFilters = {}, opts: { enable
       if (filters.categoryIds?.length) q = q.in('category_id', filters.categoryIds);
       if (filters.type) q = q.eq('type', filters.type);
       if (filters.status) q = q.eq('status', filters.status);
+      if (filters.tag) q = q.contains('tags', [filters.tag]);
       if (filters.recurrenceId) q = q.eq('recurrence_id', filters.recurrenceId);
       if (filters.installmentGroupId) q = q.eq('installment_group_id', filters.installmentGroupId);
       if (filters.createdBy) q = q.eq('created_by', filters.createdBy);
@@ -282,6 +298,7 @@ export function useInvalidateFinance() {
       qc.invalidateQueries({ queryKey: ['recurrences'] }),
       qc.invalidateQueries({ queryKey: ['investment-flows'] }),
       qc.invalidateQueries({ queryKey: ['balances-at'] }),
+      qc.invalidateQueries({ queryKey: ['tags'] }),
     ]);
   }, [qc]);
 }

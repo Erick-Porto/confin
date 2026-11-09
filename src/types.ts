@@ -15,6 +15,10 @@ export interface Profile {
   id: string;
   full_name: string | null;
   avatar_url: string | null;
+  /** Avisos de contas a pagar/receber e faturas (Fase 5). */
+  notify_bills: boolean;
+  /** Avisos de plano e orçamento perto do limite ou estourados (Fase 5). */
+  notify_budget: boolean;
   created_at: string;
 }
 
@@ -169,6 +173,8 @@ export interface Transaction {
   recurrence_id: string | null;
   /** Aplicação ligada (Fase 4): aporte, resgate, provento ou custo. Só em lançamentos que usam a conta dela. */
   investment_id: string | null;
+  /** Tags livres (Fase 5): minúsculas, sem repetir, até 10. O banco normaliza. */
+  tags: string[];
   installment_group_id: string | null;
   installment_number: number | null;
   installment_total: number | null;
@@ -192,6 +198,7 @@ export interface TransactionInput {
   category_id: string | null;
   recurrence_id?: string | null;
   investment_id?: string | null;
+  tags?: string[];
   installment_group_id?: string | null;
   installment_number?: number | null;
   installment_total?: number | null;
@@ -243,6 +250,8 @@ export interface TransactionFilters {
   categoryIds?: string[];
   type?: TxType;
   status?: TxStatus;
+  /** Lançamentos com esta tag (minúsculas). */
+  tag?: string;
   recurrenceId?: string;
   installmentGroupId?: string;
   createdBy?: string;

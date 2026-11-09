@@ -1,0 +1,42 @@
+name: Avisos (notificações)
+
+on:
+  # Todo dia às 08:00 de Brasília.
+  schedule:
+    - cron: '0 11 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: notify
+  cancel-in-progress: false
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      # Instala sem nenhum secret no ambiente.
+      - run: npm ci
+
+      # Script em scripts/notify.ts; usa as regras do app (src/) para calcular os avisos.
+      - name: Enviar avisos
+        env:
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          # Pooler do Supabase (IPv4) do projeto, região São Paulo.
+          DB_POOLER_HOST: aws-1-sa-east-1.pooler.supabase.com
+          TZ: America/Sao_Paulo
+        run: |
+          export DATABASE_URL="postgresql://postgres.${SUPABASE_PROJECT_REF}@${DB_POOLER_HOST}:5432/postgres"
+          export APP_URL="https://${GITHUB_REPOSITORY_OWNER,,}.github.io/${GITHUB_REPOSITORY#*/}/"
+          npx tsx scripts/notify.ts

@@ -1,10 +1,12 @@
 import { Fragment, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Funnel, Receipt, Search, X } from 'lucide-react';
+import { Download, Funnel, Receipt, Search, X } from 'lucide-react';
 import { useUI } from '@/context/UIContext';
-import { useAccounts, useCategories, useMembers, useTransactions } from '@/hooks/queries';
+import { useAccounts, useCategories, useGroupTags, useMembers, useTransactions } from '@/hooks/queries';
 import { accountLabel, ownerLabel } from '@/lib/accounts';
 import { buildCategoryTree, categoryPath, categoryWithChildrenIds } from '@/lib/categories';
+import { downloadCsv } from '@/features/export/csv';
+import { transactionsToCsv } from '@/features/export/csv';
 import { formatDayHeader } from '@/lib/format';
 import { isEffective, isPlanned, sumIncomeExpense } from '@/lib/rules';
 import { PeriodSwitcher, usePeriodParam } from '@/components/PeriodSwitcher';
@@ -44,6 +46,7 @@ interface Draft {
   categoria: string;
   tipo: string;
   membro: string;
+  tag: string;
   previsto: boolean;
 }
 
@@ -54,6 +57,7 @@ export default function Statement() {
   const { data: accounts = [] } = useAccounts();
   const { data: categories = [] } = useCategories();
   const { data: members = [] } = useMembers();
+  const { data: groupTags = [] } = useGroupTags();
 
   const conta = params.get('conta') ?? '';
   const categoria = params.get('categoria') ?? '';
@@ -61,13 +65,14 @@ export default function Statement() {
   const tipo = isTxType(tipoRaw) ? tipoRaw : null;
   const previsto = params.get('situacao') === 'previsto';
   const membro = params.get('membro') ?? '';
+  const tag = params.get('tag') ?? '';
 
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [filterOpen, setFilterOpen] = useState(false);
-  const [draft, setDraft] = useState<Draft>({ conta: '', categoria: '', tipo: '', membro: '', previsto: false });
+  const [draft, setDraft] = useState<Draft>({ conta: '', categoria: '', tipo: '', membro: '', tag: '', previsto: false });
 
-  const activeCount = [conta, categoria, tipo, membro, previsto].filter(Boolean).length;
+  const activeCount = [conta, categoria, tipo, membro, tag, previsto].filter(Boolean).length;
 
   const filters = useMemo<TransactionFilters>(() => {
     const f: TransactionFilters = { from: period.start, to: period.end };
@@ -75,8 +80,9 @@ export default function Statement() {
     if (categoria) f.categoryIds = categoryWithChildrenIds(categoria, categories);
     if (tipo) f.type = tipo;
     if (previsto) f.status = 'planned';
+    if (tag) f.tag = tag;
     return f;
-  }, [period.start, period.end, conta, categoria, tipo, previsto, categories]);
+  }, [period.start, period.end, conta, categoria, tipo, tag, previsto, categories]);
 
   const { data: rawTxs, isLoading, isError, refetch } = useTransactions(filters);
 
@@ -131,7 +137,7 @@ export default function Statement() {
   }
 
   function openFilters() {
-    setDraft({ conta, categoria, tipo: tipo ?? '', membro, previsto });
+    setDraft({ conta, categoria, tipo: tipo ?? '', membro, tag, previsto });
     setFilterOpen(true);
   }
 
@@ -141,14 +147,19 @@ export default function Statement() {
       categoria: draft.categoria || null,
       tipo: draft.tipo || null,
       membro: draft.membro || null,
+      tag: draft.tag || null,
       situacao: draft.previsto ? 'previsto' : null,
     });
     setFilterOpen(false);
   }
 
   function clearFilters() {
-    updateParams({ conta: null, categoria: null, tipo: null, membro: null, situacao: null });
+    updateParams({ conta: null, categoria: null, tipo: null, membro: null, tag: null, situacao: null });
     setFilterOpen(false);
+  }
+
+  function exportCsv() {
+    downloadCsv(`confin-extrato-${period.start}.csv`, transactionsToCsv(txs, { accounts, categories, members }));
   }
 
   function newTransaction() {
@@ -169,6 +180,7 @@ export default function Statement() {
   if (categoria) chips.push({ key: 'categoria', label: categoryPath(categoria, categories), clear: { categoria: null } });
   if (tipo) chips.push({ key: 'tipo', label: TYPE_LABELS[tipo], clear: { tipo: null } });
   if (membro) chips.push({ key: 'membro', label: ownerLabel(membro, members), clear: { membro: null } });
+  if (tag) chips.push({ key: 'tag', label: `#${tag}`, clear: { tag: null } });
   if (previsto) chips.push({ key: 'situacao', label: 'Só previstos', clear: { situacao: null } });
 
   const categoryOptions = (['expense', 'income'] as const).map((kind) => (
@@ -201,6 +213,9 @@ export default function Statement() {
               }}
             >
               <Search size={20} />
+            </IconButton>
+            <IconButton aria-label="Exportar CSV" onClick={exportCsv} disabled={txs.length === 0}>
+              <Download size={20} />
             </IconButton>
             <IconButton aria-label="Filtros" onClick={openFilters} className="relative">
               <Funnel size={20} />
@@ -371,6 +386,19 @@ export default function Statement() {
                 {members.map((m) => (
                   <option key={m.user_id} value={m.user_id}>
                     {ownerLabel(m.user_id, members)}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </Field>
+          <Field label="Tag">
+            {(id) => (
+              <Select id={id} value={draft.tag} onChange={(e) => setDraft({ ...draft, tag: e.target.value })}>
+                <option value="">Todas</option>
+                {tag && !groupTags.some((g) => g.tag === tag) && <option value={tag}>#{tag}</option>}
+                {groupTags.map((g) => (
+                  <option key={g.tag} value={g.tag}>
+                    #{g.tag}
                   </option>
                 ))}
               </Select>

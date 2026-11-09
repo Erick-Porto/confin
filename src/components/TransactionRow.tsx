@@ -76,6 +76,12 @@ export function TransactionRow({
           <StatusBadge tx={tx} />
         </div>
         <div className="truncate text-xs text-muted">{subtitleParts.join(' · ')}</div>
+        {tx.tags?.length > 0 && (
+          <div className="truncate text-[11px] text-muted">
+            {tx.tags.slice(0, 3).map((t) => `#${t}`).join(' ')}
+            {tx.tags.length > 3 ? ` +${tx.tags.length - 3}` : ''}
+          </div>
+        )}
       </div>
       <TxAmount
         type={tx.type}

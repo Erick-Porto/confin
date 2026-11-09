@@ -7,9 +7,8 @@ Controle financeiro da família. Grupos (ex.: FinPorto), contas com titular (ex.
 
 ## Status
 
-- Fases 0, 1, 2, 3 (planejamento: modelos como o 50/30/20, regras próprias, planejado x realizado e aporte sugerido) e 4 (investimentos: aplicações por classe, aportes, resgates, proventos, rentabilidade, alocação e evolução do patrimônio) implementadas.
+- Fases 0, 1, 2, 3 (planejamento: modelos como o 50/30/20, regras próprias, planejado x realizado e aporte sugerido), 4 (investimentos: aplicações por classe, aportes, resgates, proventos, rentabilidade, alocação e evolução do patrimônio) e 5 (previsão de saldo, contas a pagar e receber, notificações, tags, exportar CSV e excluir a conta) implementadas.
 - Testes automatizados e a bateria de testes: pendentes; serão feitos ao final, com autorização.
-- Fase 5 (previsão e avisos): não iniciada.
 
 ## Stack
 
@@ -53,6 +52,7 @@ Controle financeiro da família. Grupos (ex.: FinPorto), contas com titular (ex.
 | `SUPABASE_PROJECT_REF` | Id do projeto (o trecho antes de `.supabase.co` na URL). Usado pelo CLI nas migrações e no backup. |
 | `SUPABASE_DB_PASSWORD` | Senha do banco definida ao criar o projeto. Usada nas migrações e no backup. |
 | `BACKUP_PASSPHRASE` | Senha longa para criptografar os backups. Guarde em local seguro: sem ela o backup não abre. |
+| `VAPID_PRIVATE_KEY` | Chave privada das notificações (par da chave pública em `src/lib/vapid.ts`). Sem ela o job de avisos não envia nada. Para trocar o par: `node -e "console.log(require('web-push').generateVAPIDKeys())"`, atualize os dois lados; os aparelhos precisam ativar de novo. |
 
 4. Envie um commit para `main`. O workflow de deploy publica o site em `https://<usuario>.github.io/<repositorio>/`.
 
@@ -65,6 +65,7 @@ Controle financeiro da família. Grupos (ex.: FinPorto), contas com titular (ex.
 | `db-migrate.yml` | Push para `main` que altere `supabase/migrations/`, ou manualmente | Aplica no banco as migrações novas (`supabase db push`). |
 | `keep-alive.yml` | A cada 3 dias, ou manualmente | Faz uma consulta leve à API para o projeto gratuito não pausar por inatividade. |
 | `backup.yml` | Domingos às 02:00 (Brasília), ou manualmente | Gera dump do esquema e dos dados, criptografa com `BACKUP_PASSPHRASE` e guarda como artefato por 90 dias. |
+| `notify.yml` | Todo dia às 08:00 (Brasília), ou manualmente | Roda `scripts/notify.ts`: avisa contas que vencem hoje ou amanhã, previstos atrasados, faturas e plano ou orçamento perto do limite, sem repetir aviso. Usa `SUPABASE_DB_PASSWORD` e `VAPID_PRIVATE_KEY`. |
 
 "Manualmente" significa **Actions > nome do workflow > Run workflow**.
 

@@ -42,8 +42,8 @@ supabase/migrations/        esquema, RLS, funções e pg_cron
 
 ## Banco (Supabase)
 
-- Tabelas: `profiles`, `groups`, `group_members`, `group_invites`, `accounts`, `categories`, `recurrences`, `transactions`, `audit_log`, `plan_blocks`, `investments`, `investment_values`; view `account_balances`.
-- RPCs: `create_group(p_name) → uuid`, `create_invite(p_group) → code`, `accept_invite(p_code) → group_id`, `generate_recurrences(p_group, p_horizon_days) → int` (helper `generateRecurrences(groupId)` em `hooks/queries.ts`), `save_plan(p_group, p_blocks, p_categories)` (use `useSavePlan()`), `account_balances_at(p_group, p_dates)` (use `useAccountBalancesAt(dates)`).
+- Tabelas: `profiles`, `groups`, `group_members`, `group_invites`, `accounts`, `categories`, `recurrences`, `transactions`, `audit_log`, `plan_blocks`, `investments`, `investment_values`, `push_subscriptions`, `notification_log` (só o job); view `account_balances`.
+- RPCs: `create_group(p_name) → uuid`, `create_invite(p_group) → code`, `accept_invite(p_code) → group_id`, `generate_recurrences(p_group, p_horizon_days) → int` (helper `generateRecurrences(groupId)` em `hooks/queries.ts`), `save_plan(p_group, p_blocks, p_categories)` (use `useSavePlan()`), `account_balances_at(p_group, p_dates)` (use `useAccountBalancesAt(dates)`), `group_tags(p_group)` (use `useGroupTags()`), `register_push(...)` (use `enablePush()` de `lib/push.ts`), `delete_group(p_group)`, `delete_my_account()`.
 - `created_by`, `updated_by` e datas são preenchidos pelo banco. Não envie esses campos.
 - Grupos só são criados por `create_group`; membros só entram por `create_group`/`accept_invite`.
 - Excluir conta com lançamentos falha (FK): ofereça arquivar (`archived = true`). Idem categoria (exclusão deixa os lançamentos sem categoria; prefira arquivar).
@@ -52,7 +52,7 @@ supabase/migrations/        esquema, RLS, funções e pg_cron
 
 ## Dados no app
 
-- Leituras: `useAccounts`, `useCategories`, `useMembers`, `useInvites`, `useTransactions(filters)`, `useRecurrences`, `usePlanBlocks`, `useInvestments`, `useInvestmentValues`, `useInvestmentFlows`, `useAccountBalancesAt(dates)` (`hooks/queries.ts`).
+- Leituras: `useAccounts`, `useCategories`, `useMembers`, `useInvites`, `useTransactions(filters)`, `useRecurrences`, `usePlanBlocks`, `useInvestments`, `useInvestmentValues`, `useInvestmentFlows`, `useAccountBalancesAt(dates)`, `useGroupTags` (`hooks/queries.ts`). `useTransactions` aceita `tag`.
 - Depois de escrever em lançamentos, contas ou recorrências: `await useInvalidateFinance()()`. Para categorias: `queryClient.invalidateQueries({ queryKey: ['categories'] })`; membros: `['members']`; convites: `['invites']`.
 - Grupo ativo: `useGroup()` (`currentGroup`, `isOwner`, `memberships`, `setCurrentGroupId`, `refresh`) e `useGroupId()` dentro das telas logadas.
 - Rótulo de conta: `accountLabel(account, members)` → "Erick - Nubank" (titular nulo = "Conjunta").
@@ -62,10 +62,12 @@ supabase/migrations/        esquema, RLS, funções e pg_cron
 | Rota | Parâmetros |
 | --- | --- |
 | `/` | Início (painel) |
-| `/extrato` | `?periodo=YYYY-MM-DD` (início do período, via `usePeriodParam`), `?conta=<id>`, `?categoria=<id>` (inclui subcategorias), `?tipo=income\|expense\|transfer`, `?situacao=previsto`, `?membro=<userId>` (titular da conta) |
+| `/extrato` | `?periodo=YYYY-MM-DD` (início do período, via `usePeriodParam`), `?conta=<id>`, `?categoria=<id>` (inclui subcategorias), `?tipo=income\|expense\|transfer`, `?situacao=previsto`, `?membro=<userId>` (titular da conta), `?tag=<tag>` |
 | `/relatorios` | `?periodo=YYYY-MM-DD` |
 | `/investimentos` | Carteira; `?nova=1` abre o cadastro de aplicação, `?atualizar=1` abre "Atualizar valores" |
 | `/investimentos/:id` | Detalhe da aplicação |
+| `/agenda` | Contas a pagar e a receber (previstos, agendados e faturas dos próximos 30 dias, e atrasados) |
+| `/previsao` | Projeção do saldo disponível (até 180 dias) |
 | `/planejamento` | `?periodo=YYYY-MM-DD`; `?editar=1` abre o editor do plano |
 | `/mais` | Grupo, membros, convites, mês financeiro, tema, perfil, sair |
 | `/contas` | Lista e cadastro de contas |
@@ -99,6 +101,14 @@ Regras e cálculos em `src/features/investments/portfolio.ts` (não reimplemente
 - Gravações: `useSaveInvestment`, `useDeleteInvestment`, `useSaveInvestmentValues` (vários de uma vez), `useDeleteInvestmentValue` em `features/investments/mutations.ts`. Lançamentos continuam pelas mutações de lançamentos (`investment_id` faz parte de `TransactionInput`).
 - Rótulos e cores por classe: `INVESTMENT_CLASS_LABELS`, `INVESTMENT_CLASS_OPTIONS`, `INVESTMENT_CLASS_COLORS`, `FLOW_KIND_LABELS`.
 
+## Previsão e avisos (Fase 5)
+
+- Previsão e agenda: `src/features/forecast/forecast.ts` (leia o comentário do topo). `buildForecast` projeta o saldo disponível (contas fora de investimento; cartão entra negativo) dia a dia; `balanceOn` lê uma data; `buildAgenda` separa atrasados, hoje, 7 dias, depois e faturas, com totais a pagar e a receber.
+- Tags: `transactions.tags` (texto livre; o banco põe em minúsculas, tira repetidas e limita a 10 de 30 caracteres). Sugestões: `useGroupTags()`. Filtro: `useTransactions({ tag })`.
+- CSV: `transactionsToCsv(txs, { accounts, categories, members })` + `downloadCsv(nome, texto)`; para tudo do grupo, `fetchAllTransactions(groupId)` (pagina de 1000 em 1000) em `src/features/export/csv.ts`.
+- Notificações: `src/lib/push.ts` (`getPushState`, `enablePush`, `disablePush`, `showTestNotification`). Preferências em `profiles.notify_bills` e `profiles.notify_budget` (a própria pessoa atualiza o perfil). Quem envia é o job diário `.github/workflows/notify.yml` (`scripts/notify.ts`), por volta das 8h; no iPhone só funciona com o app instalado na tela de início.
+- Excluir grupo: `supabase.rpc('delete_group', { p_group })`. Excluir a própria conta: `supabase.rpc('delete_my_account')` e depois sair (grupos onde a pessoa está sozinha são apagados; nos outros, ela sai e as contas dela viram conjuntas).
+
 ## Interface
 
 - Mobile first: largura útil até `max-w-lg` (o `AppLayout` já centraliza e reserva espaço para a barra inferior).
@@ -120,6 +130,8 @@ Regras e cálculos em `src/features/investments/portfolio.ts` (não reimplemente
 | Recorrências e cartão | `src/pages/Recurrences.tsx`, `src/pages/CardStatement.tsx`, `src/features/recurrences/**`, `src/features/cards/**`, `src/lib/card.ts` |
 | Planejamento | `src/pages/Planning.tsx`, `src/features/planning/**` (exceto mudar `plan.ts` e `mutations.ts`) |
 | Investimentos | `src/pages/Investments.tsx`, `src/pages/InvestmentDetail.tsx`, `src/features/investments/**` (exceto mudar `portfolio.ts` e `mutations.ts`) |
-| Infra | `.github/workflows/*`, `README.md` |
+| Tags e CSV no extrato | `src/features/tags/**`, `src/pages/Statement.tsx`, `src/pages/Reports.tsx`, `src/features/transactions/TransactionForm.tsx`, `src/components/TransactionRow.tsx` |
+| Agenda, previsão, notificações e conta | `src/pages/Agenda.tsx`, `src/pages/Forecast.tsx`, `src/features/notifications/**`, `src/pages/More.tsx`, `src/pages/Home.tsx`, `src/App.tsx` |
+| Infra | `.github/workflows/*`, `scripts/*`, `README.md` |
 
 Precisa mudar um arquivo compartilhado? Não mude: descreva a mudança no relatório final.
