@@ -7,6 +7,7 @@ import { useAccounts, useCategories, useMembers, useTransactions } from '@/hooks
 import { PeriodSwitcher, useMonthStartDay, usePeriodParam } from '@/components/PeriodSwitcher';
 import { CategoryDonut } from '@/components/charts/CategoryDonut';
 import { MonthlyBars } from '@/components/charts/MonthlyBars';
+import { NetWorthCard } from '@/features/investments/NetWorthCard';
 import { Card, EmptyState, Money, PageHeader, Segmented, Skeleton } from '@/components/ui';
 import { errorMessage } from '@/lib/errors';
 import { formatPercent, parseISODate } from '@/lib/format';
@@ -175,6 +176,8 @@ export default function Reports() {
             { value: 'pessoas', label: 'Pessoas' },
           ]}
         />
+
+        {tab === 'evolucao' && <NetWorthCard />}
 
         {txQ.isError ? (
           <ErrorBox error={txQ.error} />

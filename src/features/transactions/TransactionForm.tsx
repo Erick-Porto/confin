@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ChevronDown, ChevronUp, Repeat, Trash } from 'lucide-react';
 import { useGroupId } from '@/context/GroupContext';
 import { useUI, type TransactionDefaults } from '@/context/UIContext';
-import { useAccounts, useCategories, useMembers } from '@/hooks/queries';
+import { useAccounts, useCategories, useInvestments, useMembers } from '@/hooks/queries';
 import { errorMessage } from '@/lib/errors';
 import { formatCents, formatDate, parseISODate, todayISO, toISODate } from '@/lib/format';
 import { splitInstallments } from '@/lib/rules';
@@ -75,6 +75,7 @@ export default function TransactionForm({
   const { data: accounts = [], isLoading: loadingAccounts } = useAccounts();
   const { data: categories = [] } = useCategories();
   const { data: members = [] } = useMembers();
+  const { data: investments = [] } = useInvestments();
 
   const save = useSaveTransaction();
   const createInstallments = useCreateInstallments();
@@ -105,6 +106,13 @@ export default function TransactionForm({
   const activeAccounts = useMemo(() => accounts.filter((a) => !a.archived), [accounts]);
   const [accountId, setAccountId] = useState<string>(transaction?.account_id ?? defaults?.account_id ?? '');
   const [toAccountId, setToAccountId] = useState<string>(transaction?.to_account_id ?? defaults?.to_account_id ?? '');
+  const [investmentId, setInvestmentId] = useState<string>(transaction?.investment_id ?? defaults?.investment_id ?? '');
+  // Aplicações das contas de investimento escolhidas; o vínculo some se não combinar mais com elas.
+  const investmentOptions = useMemo(() => {
+    const ids = type === 'transfer' ? [accountId, toAccountId] : [accountId];
+    return investments.filter((i) => (!i.archived || i.id === transaction?.investment_id) && ids.includes(i.account_id));
+  }, [investments, type, accountId, toAccountId, transaction?.investment_id]);
+  const linkedInvestmentId = investmentOptions.some((i) => i.id === investmentId) ? investmentId : '';
 
   // Conta padrão: última usada, senão a primeira ativa. Espera as contas carregarem.
   // Nunca a mesma do destino (ex.: "Pagar fatura" já vem com o cartão como destino).
@@ -130,6 +138,7 @@ export default function TransactionForm({
   const [showNotes, setShowNotes] = useState(!!transaction?.notes);
   const [paid, setPaid] = useState<boolean>((transaction?.status ?? defaults?.status ?? 'posted') === 'posted');
   const [installments, setInstallments] = useState(false);
+  const showInvestment = investmentOptions.length > 0 && !isInstallment && !(type === 'expense' && installments);
   const [count, setCount] = useState(2);
   const [errors, setErrors] = useState<Errors>({});
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -192,6 +201,7 @@ export default function TransactionForm({
       account_id: accountId,
       to_account_id: type === 'transfer' ? toAccountId : null,
       category_id: type === 'transfer' ? null : categoryId,
+      investment_id: showInvestment ? linkedInvestmentId || null : null,
     };
   }
 
@@ -381,6 +391,21 @@ export default function TransactionForm({
             </>
           ) : (
             <AccountChips label="Conta" accounts={selectableAccounts} members={members} value={accountId} onChange={changeAccount} error={errors.account} />
+          )}
+
+          {showInvestment && (
+            <Field label="Aplicação">
+              {(id) => (
+                <Select id={id} value={linkedInvestmentId} onChange={(e) => setInvestmentId(e.target.value)}>
+                  <option value="">Nenhuma</option>
+                  {investmentOptions.map((i) => (
+                    <option key={i.id} value={i.id}>
+                      {i.name}
+                    </option>
+                  ))}
+                </Select>
+              )}
+            </Field>
           )}
 
           <div>

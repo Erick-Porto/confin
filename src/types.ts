@@ -98,6 +98,45 @@ export interface Category {
   created_at: string;
 }
 
+export type InvestmentClass = 'fixed_income' | 'treasury' | 'stocks' | 'reits' | 'funds' | 'crypto' | 'pension' | 'other';
+
+/** Aplicação dentro de uma conta de investimento (Fase 4). */
+export interface Investment {
+  id: string;
+  group_id: string;
+  /** Sempre uma conta do tipo 'investment'. */
+  account_id: string;
+  name: string;
+  class: InvestmentClass;
+  /** Posição de abertura: valor de mercado e quanto já estava aplicado no início desse dia. */
+  opening_date: ISODate;
+  opening_value_cents: number;
+  opening_cost_cents: number;
+  archived: boolean;
+  created_at: string;
+}
+
+export type InvestmentInput = Pick<
+  Investment,
+  'group_id' | 'account_id' | 'name' | 'class' | 'opening_date' | 'opening_value_cents' | 'opening_cost_cents' | 'archived'
+>;
+
+/** Valor de mercado informado numa data (fim do dia). Um por dia por aplicação. */
+export interface InvestmentValue {
+  id: string;
+  group_id: string;
+  investment_id: string;
+  date: ISODate;
+  value_cents: number;
+}
+
+/** Saldo contábil de uma conta numa data (RPC account_balances_at). */
+export interface AccountBalanceAt {
+  as_of: ISODate;
+  account_id: string;
+  balance_cents: number;
+}
+
 export type PlanBlockKind = 'spend' | 'invest';
 
 /** Bloco do plano financeiro (Fase 3). Os blocos de um grupo somam 100% da renda. */
@@ -128,6 +167,8 @@ export interface Transaction {
   /** Sempre null em transferência. */
   category_id: string | null;
   recurrence_id: string | null;
+  /** Aplicação ligada (Fase 4): aporte, resgate, provento ou custo. Só em lançamentos que usam a conta dela. */
+  investment_id: string | null;
   installment_group_id: string | null;
   installment_number: number | null;
   installment_total: number | null;
@@ -150,6 +191,7 @@ export interface TransactionInput {
   to_account_id: string | null;
   category_id: string | null;
   recurrence_id?: string | null;
+  investment_id?: string | null;
   installment_group_id?: string | null;
   installment_number?: number | null;
   installment_total?: number | null;

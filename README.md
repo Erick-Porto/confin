@@ -7,9 +7,9 @@ Controle financeiro da família. Grupos (ex.: FinPorto), contas com titular (ex.
 
 ## Status
 
-- Fases 0, 1, 2 e 3 (planejamento: modelos como o 50/30/20, regras próprias, planejado x realizado e aporte sugerido) implementadas.
+- Fases 0, 1, 2, 3 (planejamento: modelos como o 50/30/20, regras próprias, planejado x realizado e aporte sugerido) e 4 (investimentos: aplicações por classe, aportes, resgates, proventos, rentabilidade, alocação e evolução do patrimônio) implementadas.
 - Testes automatizados e a bateria de testes: pendentes; serão feitos ao final, com autorização.
-- Fase 4 (patrimônio e investimentos) e Fase 5 (previsão e avisos): não iniciadas.
+- Fase 5 (previsão e avisos): não iniciada.
 
 ## Stack
 

@@ -13,6 +13,8 @@ export interface TransactionDefaults {
   account_id?: string;
   to_account_id?: string;
   category_id?: string;
+  /** Aplicação ligada (aporte, resgate, provento). */
+  investment_id?: string;
 }
 
 export interface TransactionSheetState {

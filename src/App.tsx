@@ -16,6 +16,8 @@ const Home = lazy(() => import('@/pages/Home'));
 const Statement = lazy(() => import('@/pages/Statement'));
 const Reports = lazy(() => import('@/pages/Reports'));
 const Planning = lazy(() => import('@/pages/Planning'));
+const Investments = lazy(() => import('@/pages/Investments'));
+const InvestmentDetail = lazy(() => import('@/pages/InvestmentDetail'));
 const More = lazy(() => import('@/pages/More'));
 const Accounts = lazy(() => import('@/pages/Accounts'));
 const CardStatement = lazy(() => import('@/pages/CardStatement'));
@@ -84,6 +86,8 @@ export default function App() {
           <Route path="extrato" element={<Statement />} />
           <Route path="relatorios" element={<Reports />} />
           <Route path="planejamento" element={<Planning />} />
+          <Route path="investimentos" element={<Investments />} />
+          <Route path="investimentos/:id" element={<InvestmentDetail />} />
           <Route path="mais" element={<More />} />
           <Route path="contas" element={<Accounts />} />
           <Route path="contas/:id/fatura" element={<CardStatement />} />

@@ -42,8 +42,8 @@ supabase/migrations/        esquema, RLS, funções e pg_cron
 
 ## Banco (Supabase)
 
-- Tabelas: `profiles`, `groups`, `group_members`, `group_invites`, `accounts`, `categories`, `recurrences`, `transactions`, `audit_log`, `plan_blocks`; view `account_balances`.
-- RPCs: `create_group(p_name) → uuid`, `create_invite(p_group) → code`, `accept_invite(p_code) → group_id`, `generate_recurrences(p_group, p_horizon_days) → int` (helper `generateRecurrences(groupId)` em `hooks/queries.ts`), `save_plan(p_group, p_blocks, p_categories)` (use `useSavePlan()`).
+- Tabelas: `profiles`, `groups`, `group_members`, `group_invites`, `accounts`, `categories`, `recurrences`, `transactions`, `audit_log`, `plan_blocks`, `investments`, `investment_values`; view `account_balances`.
+- RPCs: `create_group(p_name) → uuid`, `create_invite(p_group) → code`, `accept_invite(p_code) → group_id`, `generate_recurrences(p_group, p_horizon_days) → int` (helper `generateRecurrences(groupId)` em `hooks/queries.ts`), `save_plan(p_group, p_blocks, p_categories)` (use `useSavePlan()`), `account_balances_at(p_group, p_dates)` (use `useAccountBalancesAt(dates)`).
 - `created_by`, `updated_by` e datas são preenchidos pelo banco. Não envie esses campos.
 - Grupos só são criados por `create_group`; membros só entram por `create_group`/`accept_invite`.
 - Excluir conta com lançamentos falha (FK): ofereça arquivar (`archived = true`). Idem categoria (exclusão deixa os lançamentos sem categoria; prefira arquivar).
@@ -52,7 +52,7 @@ supabase/migrations/        esquema, RLS, funções e pg_cron
 
 ## Dados no app
 
-- Leituras: `useAccounts`, `useCategories`, `useMembers`, `useInvites`, `useTransactions(filters)`, `useRecurrences`, `usePlanBlocks` (`hooks/queries.ts`).
+- Leituras: `useAccounts`, `useCategories`, `useMembers`, `useInvites`, `useTransactions(filters)`, `useRecurrences`, `usePlanBlocks`, `useInvestments`, `useInvestmentValues`, `useInvestmentFlows`, `useAccountBalancesAt(dates)` (`hooks/queries.ts`).
 - Depois de escrever em lançamentos, contas ou recorrências: `await useInvalidateFinance()()`. Para categorias: `queryClient.invalidateQueries({ queryKey: ['categories'] })`; membros: `['members']`; convites: `['invites']`.
 - Grupo ativo: `useGroup()` (`currentGroup`, `isOwner`, `memberships`, `setCurrentGroupId`, `refresh`) e `useGroupId()` dentro das telas logadas.
 - Rótulo de conta: `accountLabel(account, members)` → "Erick - Nubank" (titular nulo = "Conjunta").
@@ -64,6 +64,8 @@ supabase/migrations/        esquema, RLS, funções e pg_cron
 | `/` | Início (painel) |
 | `/extrato` | `?periodo=YYYY-MM-DD` (início do período, via `usePeriodParam`), `?conta=<id>`, `?categoria=<id>` (inclui subcategorias), `?tipo=income\|expense\|transfer`, `?situacao=previsto`, `?membro=<userId>` (titular da conta) |
 | `/relatorios` | `?periodo=YYYY-MM-DD` |
+| `/investimentos` | Carteira; `?nova=1` abre o cadastro de aplicação, `?atualizar=1` abre "Atualizar valores" |
+| `/investimentos/:id` | Detalhe da aplicação |
 | `/planejamento` | `?periodo=YYYY-MM-DD`; `?editar=1` abre o editor do plano |
 | `/mais` | Grupo, membros, convites, mês financeiro, tema, perfil, sair |
 | `/contas` | Lista e cadastro de contas |
@@ -88,6 +90,15 @@ Regras e cálculos em `src/features/planning/plan.ts` (não reimplemente):
 - Alertas: `planAlerts(summary)` (blocos de gasto a partir de 80% ou estourados; vazio sem renda).
 - Editor: rascunho `PlanDraft` criado por `draftFromTemplate` (modelos em `PLAN_TEMPLATES`), `draftBlank` ou `draftFromPlan`; `validateDraft` diz o que impede salvar; `useSavePlan()` grava tudo de uma vez (rascunho sem blocos remove o plano). Depois de salvar, as listas de blocos e categorias já são atualizadas pela mutação.
 
+## Patrimônio e investimentos (Fase 4)
+
+Regras e cálculos em `src/features/investments/portfolio.ts` (não reimplemente; leia o comentário do topo):
+- Aplicação (`investments`) fica numa conta do tipo investimento e tem posição de abertura (data, valor de mercado, custo). Valores de mercado ficam em `investment_values` (um por dia; gravar de novo no mesmo dia substitui).
+- Aportes, resgates, proventos e custos são lançamentos comuns com `investment_id`: aporte = transferência para a conta da aplicação, resgate = transferência saindo dela, provento = entrada na conta, custo = saída na conta. `flowKind(tx, inv)` diz o papel. O banco desfaz o vínculo se o lançamento não usar a conta da aplicação.
+- `positionAt` (valor, aplicado, proventos, lucro, rentabilidade simples), `portfolio` (carteira de hoje, dinheiro parado e alocação por classe), `netWorthSeries` (patrimônio por data: passe as mesmas datas de `useAccountBalancesAt`, sempre até hoje).
+- Gravações: `useSaveInvestment`, `useDeleteInvestment`, `useSaveInvestmentValues` (vários de uma vez), `useDeleteInvestmentValue` em `features/investments/mutations.ts`. Lançamentos continuam pelas mutações de lançamentos (`investment_id` faz parte de `TransactionInput`).
+- Rótulos e cores por classe: `INVESTMENT_CLASS_LABELS`, `INVESTMENT_CLASS_OPTIONS`, `INVESTMENT_CLASS_COLORS`, `FLOW_KIND_LABELS`.
+
 ## Interface
 
 - Mobile first: largura útil até `max-w-lg` (o `AppLayout` já centraliza e reserva espaço para a barra inferior).
@@ -108,6 +119,7 @@ Regras e cálculos em `src/features/planning/plan.ts` (não reimplemente):
 | Painel e relatórios | `src/pages/Home.tsx`, `src/pages/Reports.tsx`, `src/features/dashboard/**`, `src/components/charts/**` |
 | Recorrências e cartão | `src/pages/Recurrences.tsx`, `src/pages/CardStatement.tsx`, `src/features/recurrences/**`, `src/features/cards/**`, `src/lib/card.ts` |
 | Planejamento | `src/pages/Planning.tsx`, `src/features/planning/**` (exceto mudar `plan.ts` e `mutations.ts`) |
+| Investimentos | `src/pages/Investments.tsx`, `src/pages/InvestmentDetail.tsx`, `src/features/investments/**` (exceto mudar `portfolio.ts` e `mutations.ts`) |
 | Infra | `.github/workflows/*`, `README.md` |
 
 Precisa mudar um arquivo compartilhado? Não mude: descreva a mudança no relatório final.

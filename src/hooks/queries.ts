@@ -5,8 +5,11 @@ import { sortAccounts } from '@/lib/accounts';
 import { useGroup } from '@/context/GroupContext';
 import type {
   Account,
+  AccountBalanceAt,
   AccountWithBalance,
   Category,
+  Investment,
+  InvestmentValue,
   Invite,
   Member,
   PlanBlock,
@@ -27,6 +30,10 @@ export const qk = {
   transactions: (groupId: string, filters: TransactionFilters) => ['transactions', groupId, filters] as const,
   recurrences: (groupId: string) => ['recurrences', groupId] as const,
   planBlocks: (groupId: string) => ['plan-blocks', groupId] as const,
+  investments: (groupId: string) => ['investments', groupId] as const,
+  investmentValues: (groupId: string) => ['investment-values', groupId] as const,
+  investmentFlows: (groupId: string) => ['investment-flows', groupId] as const,
+  balancesAt: (groupId: string, dates: string[]) => ['balances-at', groupId, dates.join(',')] as const,
 };
 
 function useCurrentGroupId(): string | null {
@@ -95,6 +102,78 @@ export function usePlanBlocks() {
         .order('sort_order');
       if (error) throw error;
       return data as PlanBlock[];
+    },
+  });
+}
+
+/** Aplicações do grupo (inclusive arquivadas), por nome. */
+export function useInvestments() {
+  const groupId = useCurrentGroupId();
+  return useQuery({
+    queryKey: qk.investments(groupId ?? ''),
+    enabled: !!groupId,
+    queryFn: async (): Promise<Investment[]> => {
+      const { data, error } = await supabase.from('investments').select('*').eq('group_id', groupId!).order('name');
+      if (error) throw error;
+      return (data as Investment[]).map((i) => ({
+        ...i,
+        opening_value_cents: Number(i.opening_value_cents),
+        opening_cost_cents: Number(i.opening_cost_cents),
+      }));
+    },
+  });
+}
+
+/** Todos os valores informados das aplicações do grupo, do mais antigo para o mais novo. */
+export function useInvestmentValues() {
+  const groupId = useCurrentGroupId();
+  return useQuery({
+    queryKey: qk.investmentValues(groupId ?? ''),
+    enabled: !!groupId,
+    queryFn: async (): Promise<InvestmentValue[]> => {
+      const { data, error } = await supabase
+        .from('investment_values')
+        .select('id, group_id, investment_id, date, value_cents')
+        .eq('group_id', groupId!)
+        .order('date');
+      if (error) throw error;
+      return (data as InvestmentValue[]).map((v) => ({ ...v, value_cents: Number(v.value_cents) }));
+    },
+  });
+}
+
+/** Lançamentos ligados a alguma aplicação (aportes, resgates, proventos, custos), todos os status e datas. */
+export function useInvestmentFlows() {
+  const groupId = useCurrentGroupId();
+  return useQuery({
+    queryKey: qk.investmentFlows(groupId ?? ''),
+    enabled: !!groupId,
+    queryFn: async (): Promise<Transaction[]> => {
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('group_id', groupId!)
+        .not('investment_id', 'is', null)
+        .order('date');
+      if (error) throw error;
+      return (data as Transaction[]).map((t) => ({ ...t, amount_cents: Number(t.amount_cents) }));
+    },
+  });
+}
+
+/**
+ * Saldo contábil de cada conta no fim de cada data (para a evolução do patrimônio).
+ * Passe datas até hoje (use o menor entre o fim do período e hoje), senão entram lançamentos agendados.
+ */
+export function useAccountBalancesAt(dates: string[]) {
+  const groupId = useCurrentGroupId();
+  return useQuery({
+    queryKey: qk.balancesAt(groupId ?? '', dates),
+    enabled: !!groupId && dates.length > 0,
+    queryFn: async (): Promise<AccountBalanceAt[]> => {
+      const { data, error } = await supabase.rpc('account_balances_at', { p_group: groupId, p_dates: dates });
+      if (error) throw error;
+      return (data as AccountBalanceAt[]).map((r) => ({ ...r, balance_cents: Number(r.balance_cents) }));
     },
   });
 }
@@ -201,6 +280,8 @@ export function useInvalidateFinance() {
       qc.invalidateQueries({ queryKey: ['transactions'] }),
       qc.invalidateQueries({ queryKey: ['accounts'] }),
       qc.invalidateQueries({ queryKey: ['recurrences'] }),
+      qc.invalidateQueries({ queryKey: ['investment-flows'] }),
+      qc.invalidateQueries({ queryKey: ['balances-at'] }),
     ]);
   }, [qc]);
 }

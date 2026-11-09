@@ -10,6 +10,7 @@ import {
   LogOut,
   Plus,
   Target,
+  TrendingUp,
   Repeat,
   Share2,
   Tag,
@@ -481,6 +482,12 @@ export default function More() {
           onClick={() => navigate('/planejamento')}
           leading={<Target size={20} className="text-muted" />}
           title="Planejamento"
+          trailing={<Chevron />}
+        />
+        <ListItem
+          onClick={() => navigate('/investimentos')}
+          leading={<TrendingUp size={20} className="text-muted" />}
+          title="Investimentos"
           trailing={<Chevron />}
         />
         <ListItem

@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronDown, ChevronUp, Plus, Wallet } from 'lucide-react';
-import { useAccounts, useMembers } from '@/hooks/queries';
+import { useAccounts, useInvestmentFlows, useInvestmentValues, useInvestments, useMembers } from '@/hooks/queries';
+import { accountMarketValue, portfolio } from '@/features/investments/portfolio';
 import { ACCOUNT_TYPE_LABELS, accountLabel } from '@/lib/accounts';
 import { AccountForm } from '@/features/accounts/AccountForm';
 import { Button, Card, EmptyState, ListItem, Money, PageHeader, SectionTitle, Skeleton } from '@/components/ui';
@@ -30,6 +31,13 @@ export default function Accounts() {
   const totalRegular = groups.regular.reduce((s, a) => s + a.balance_cents, 0);
   const totalBills = groups.cards.reduce((s, a) => s + Math.min(a.balance_cents, 0), 0);
   const totalInvest = groups.investments.reduce((s, a) => s + a.balance_cents, 0);
+  const invQ = useInvestments();
+  const valuesQ = useInvestmentValues();
+  const flowsQ = useInvestmentFlows();
+  const marketValue = useMemo(() => {
+    const { positions } = portfolio(invQ.data ?? [], valuesQ.data ?? [], flowsQ.data ?? [], accounts);
+    return groups.investments.reduce((s, a) => s + accountMarketValue(a.id, a.balance_cents, positions), 0);
+  }, [invQ.data, valuesQ.data, flowsQ.data, accounts, groups.investments]);
 
   function openNew() {
     setEditing(null);
@@ -148,6 +156,14 @@ export default function Accounts() {
               <div>
                 <p className="text-xs text-muted">Investimentos</p>
                 <Money cents={totalInvest} className="text-base font-semibold text-invest" />
+                {groups.investments.length > 0 && (
+                  <p className="text-xs text-muted">
+                    Valor de mercado: <Money cents={marketValue} />{' '}
+                    <Link to="/investimentos" className="font-medium text-brand-700 dark:text-brand-300">
+                      Ver carteira
+                    </Link>
+                  </p>
+                )}
               </div>
             </div>
           </Card>
