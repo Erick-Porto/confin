@@ -68,6 +68,7 @@ supabase/migrations/        esquema, RLS, funções e pg_cron
 | `/investimentos/:id` | Detalhe da aplicação |
 | `/agenda` | Contas a pagar e a receber (previstos, agendados e faturas dos próximos 30 dias, e atrasados) |
 | `/previsao` | Projeção do saldo disponível (até 180 dias) |
+| `/notificacoes` | Ativar notificações neste aparelho e escolher os avisos (o card "Avisos" do Início leva para cá) |
 | `/planejamento` | `?periodo=YYYY-MM-DD`; `?editar=1` abre o editor do plano |
 | `/mais` | Grupo, membros, convites, mês financeiro, tema, perfil, sair |
 | `/contas` | Lista e cadastro de contas |

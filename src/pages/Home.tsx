@@ -11,6 +11,7 @@ import { planAlerts, planSummary } from '@/features/planning/plan';
 import { useConfirmTransaction } from '@/features/transactions/mutations';
 import { useMonthStartDay } from '@/components/PeriodSwitcher';
 import { TransactionRow } from '@/components/TransactionRow';
+import { NotificationsInvite } from '@/features/notifications/NotificationsInvite';
 import { CategoryDonut } from '@/components/charts/CategoryDonut';
 import { Button, Card, CardHeader, EmptyState, IconButton, Money, Skeleton } from '@/components/ui';
 import { accountLabel, isCreditCard } from '@/lib/accounts';
@@ -148,6 +149,8 @@ export default function Home() {
               </Link>
             )}
           </section>
+
+          <NotificationsInvite />
 
           {activeAccounts.length === 0 ? (
             <Card>

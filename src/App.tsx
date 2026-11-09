@@ -18,6 +18,7 @@ const Reports = lazy(() => import('@/pages/Reports'));
 const Planning = lazy(() => import('@/pages/Planning'));
 const Agenda = lazy(() => import('@/pages/Agenda'));
 const Forecast = lazy(() => import('@/pages/Forecast'));
+const Notifications = lazy(() => import('@/pages/Notifications'));
 const Investments = lazy(() => import('@/pages/Investments'));
 const InvestmentDetail = lazy(() => import('@/pages/InvestmentDetail'));
 const More = lazy(() => import('@/pages/More'));
@@ -90,6 +91,7 @@ export default function App() {
           <Route path="planejamento" element={<Planning />} />
           <Route path="agenda" element={<Agenda />} />
           <Route path="previsao" element={<Forecast />} />
+          <Route path="notificacoes" element={<Notifications />} />
           <Route path="investimentos" element={<Investments />} />
           <Route path="investimentos/:id" element={<InvestmentDetail />} />
           <Route path="mais" element={<More />} />
