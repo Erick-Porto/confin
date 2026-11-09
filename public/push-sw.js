@@ -10,14 +10,18 @@ self.addEventListener('push', (event) => {
   const scope = self.registration.scope;
   // Só abre telas do próprio app.
   const url = typeof data.url === 'string' && data.url.startsWith(scope) ? data.url : scope;
-  event.waitUntil(
-    self.registration.showNotification(data.title || 'Confin', {
-      body: data.body || '',
-      tag: data.tag || undefined,
-      icon: new URL('icon.svg', scope).href,
-      data: { url },
-    }),
-  );
+  const options = {
+    body: data.body || '',
+    icon: new URL('icon.svg', scope).href,
+    vibrate: [200, 100, 200],
+    data: { url },
+  };
+  // Um aviso novo com a mesma tag substitui o anterior; renotify faz ele tocar e vibrar de novo.
+  if (data.tag) {
+    options.tag = data.tag;
+    options.renotify = true;
+  }
+  event.waitUntil(self.registration.showNotification(data.title || 'Confin', options));
 });
 
 self.addEventListener('notificationclick', (event) => {

@@ -87,9 +87,13 @@ export async function disablePush(): Promise<void> {
 /** Aviso local, só para conferir se o aparelho mostra notificações (não passa pelo servidor). */
 export async function showTestNotification(): Promise<void> {
   const reg = await readyRegistration();
-  await reg.showNotification('Confin', {
+  // renotify e vibrate ainda não estão nos tipos do TypeScript, mas o Chrome do Android usa.
+  const options: NotificationOptions & { renotify?: boolean; vibrate?: number[] } = {
     body: 'As notificações estão funcionando neste aparelho.',
     tag: 'confin-teste',
+    renotify: true,
+    vibrate: [200, 100, 200],
     icon: new URL('icon.svg', reg.scope).href,
-  });
+  };
+  await reg.showNotification('Confin', options);
 }
