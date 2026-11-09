@@ -5,6 +5,11 @@ on:
   schedule:
     - cron: '0 11 * * *'
   workflow_dispatch:
+    inputs:
+      teste:
+        description: 'Enviar só uma notificação de teste para os aparelhos inscritos'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -36,6 +41,7 @@ jobs:
           # Pooler do Supabase (IPv4) do projeto, região São Paulo.
           DB_POOLER_HOST: aws-1-sa-east-1.pooler.supabase.com
           TZ: America/Sao_Paulo
+          NOTIFY_TEST: ${{ inputs.teste }}
         run: |
           export DATABASE_URL="postgresql://postgres.${SUPABASE_PROJECT_REF}@${DB_POOLER_HOST}:5432/postgres"
           export APP_URL="https://${GITHUB_REPOSITORY_OWNER,,}.github.io/${GITHUB_REPOSITORY#*/}/"

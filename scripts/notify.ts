@@ -76,6 +76,26 @@ async function main(): Promise<void> {
       console.log('Nenhum aparelho inscrito.');
       return;
     }
+    if (process.env.NOTIFY_TEST === 'true') {
+      // Disparo manual de teste: um aviso simples para todos os aparelhos inscritos, sem registrar no log.
+      const payload = JSON.stringify({
+        title: 'Confin',
+        body: 'Notificação de teste: os avisos estão funcionando neste aparelho.',
+        url: APP_URL,
+        tag: 'confin-teste',
+      });
+      let ok = 0;
+      for (const s of subs) {
+        try {
+          await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, payload, { TTL: 3600 });
+          ok++;
+        } catch (err) {
+          console.log(`::warning::Falha no teste (HTTP ${(err as { statusCode?: number }).statusCode ?? 'sem resposta'}).`);
+        }
+      }
+      console.log(`Teste enviado para ${ok} de ${subs.length} aparelho(s).`);
+      return;
+    }
     const userIds = [...new Set(subs.map((s) => s.user_id))];
     const { rows: memberships } = await db.query<{ group_id: string; user_id: string; name: string; month_start_day: number }>(
       `select gm.group_id, gm.user_id, g.name, g.month_start_day
