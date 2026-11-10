@@ -56,7 +56,7 @@ export function transactionsToCsv(
         tx.notes ?? '',
       ];
     });
-  return '﻿' + [header, ...rows].map((r) => r.map(cell).join(';')).join('\r\n');
+  return '\uFEFF' + [header, ...rows].map((r) => r.map(cell).join(';')).join('\r\n');
 }
 
 /** Baixa o texto como arquivo .csv. */

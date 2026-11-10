@@ -9,6 +9,8 @@ import {
   Copy,
   Crown,
   Download,
+  FileUp,
+  Flag,
   LineChart,
   LogOut,
   Plus,
@@ -30,6 +32,7 @@ import { supabase, inviteUrl } from '@/lib/supabase';
 import { errorMessage } from '@/lib/errors';
 import { firstName, todayISO } from '@/lib/format';
 import { downloadCsv, fetchAllTransactions, transactionsToCsv } from '@/features/export/csv';
+import { ExportOfxSheet } from '@/features/export/ExportOfxSheet';
 import { NotificationSettings } from '@/features/notifications/NotificationSettings';
 import {
   Button,
@@ -105,6 +108,7 @@ export default function More() {
   const [deleteText, setDeleteText] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [ofxOpen, setOfxOpen] = useState(false);
   const [confirmAccount, setConfirmAccount] = useState(false);
   const [accountText, setAccountText] = useState('');
   const [deletingAccount, setDeletingAccount] = useState(false);
@@ -529,6 +533,12 @@ export default function More() {
           trailing={<Chevron />}
         />
         <ListItem
+          onClick={() => navigate('/metas')}
+          leading={<Flag size={20} className="text-muted" />}
+          title="Metas"
+          trailing={<Chevron />}
+        />
+        <ListItem
           onClick={() => navigate('/agenda')}
           leading={<CalendarClock size={20} className="text-muted" />}
           title="Contas a pagar e receber"
@@ -567,6 +577,17 @@ export default function More() {
           onClick={exporting ? undefined : () => void exportCsv()}
           leading={<Download size={20} className="text-muted" />}
           title={exporting ? 'Exportando...' : 'Exportar todos os lançamentos (CSV)'}
+        />
+        <ListItem
+          onClick={() => navigate('/importar')}
+          leading={<FileUp size={20} className="text-muted" />}
+          title="Importar extrato"
+          trailing={<Chevron />}
+        />
+        <ListItem
+          onClick={() => setOfxOpen(true)}
+          leading={<Download size={20} className="text-muted" />}
+          title="Exportar extrato OFX"
         />
       </Card>
 
@@ -617,6 +638,8 @@ export default function More() {
         Sair da conta
       </Button>
       <p className="mt-4 text-center text-xs text-muted">Confin v0.1</p>
+
+      <ExportOfxSheet open={ofxOpen} onClose={() => setOfxOpen(false)} />
 
       {/* Editar perfil */}
       <Sheet

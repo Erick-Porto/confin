@@ -19,6 +19,8 @@ const Planning = lazy(() => import('@/pages/Planning'));
 const Agenda = lazy(() => import('@/pages/Agenda'));
 const Forecast = lazy(() => import('@/pages/Forecast'));
 const Notifications = lazy(() => import('@/pages/Notifications'));
+const Goals = lazy(() => import('@/pages/Goals'));
+const Import = lazy(() => import('@/pages/Import'));
 const Investments = lazy(() => import('@/pages/Investments'));
 const InvestmentDetail = lazy(() => import('@/pages/InvestmentDetail'));
 const More = lazy(() => import('@/pages/More'));
@@ -92,6 +94,8 @@ export default function App() {
           <Route path="agenda" element={<Agenda />} />
           <Route path="previsao" element={<Forecast />} />
           <Route path="notificacoes" element={<Notifications />} />
+          <Route path="metas" element={<Goals />} />
+          <Route path="importar" element={<Import />} />
           <Route path="investimentos" element={<Investments />} />
           <Route path="investimentos/:id" element={<InvestmentDetail />} />
           <Route path="mais" element={<More />} />

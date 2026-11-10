@@ -6,6 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useGroup } from '@/context/GroupContext';
 import { useUI } from '@/context/UIContext';
 import { useAccounts, useCategories, useMembers, usePlanBlocks, useTransactions } from '@/hooks/queries';
+import { useGoalStatuses } from '@/features/goals/useGoalStatuses';
 import { PlanBar } from '@/features/planning/PlanBar';
 import { planAlerts, planSummary } from '@/features/planning/plan';
 import { useConfirmTransaction } from '@/features/transactions/mutations';
@@ -65,6 +66,16 @@ export default function Home() {
   const donut = useMemo(() => topWithOthers(slices, 5), [slices]);
   const totalExpense = slices.reduce((s, x) => s + x.cents, 0);
   const budgets = useMemo(() => budgetStatuses(periodTxs, categories, today), [periodTxs, categories, today]);
+
+  const { statuses: goalStatuses } = useGoalStatuses();
+  const homeGoals = useMemo(
+    () =>
+      goalStatuses
+        .filter((s) => !s.goal.archived)
+        .sort((a, b) => (a.goal.target_date ?? '9999').localeCompare(b.goal.target_date ?? '9999'))
+        .slice(0, 3),
+    [goalStatuses],
+  );
 
   const planQ = usePlanBlocks();
   const planBlocks = useMemo(() => planQ.data ?? [], [planQ.data]);
@@ -339,6 +350,34 @@ export default function Home() {
                     </ul>
                   </Card>
                 ) : null
+              )}
+
+              {homeGoals.length > 0 && (
+                <Card>
+                  <CardHeader
+                    title="Metas"
+                    action={
+                      <Link to="/metas" className="flex min-h-11 items-center text-sm font-semibold text-brand-700 dark:text-brand-300">
+                        Ver metas
+                      </Link>
+                    }
+                  />
+                  <ul className="flex flex-col gap-3">
+                    {homeGoals.map((s) => (
+                      <li key={s.goal.id}>
+                        <div className="flex items-baseline justify-between gap-2 text-sm">
+                          <span className="truncate font-medium">{s.goal.name}</span>
+                          <span className="shrink-0 text-xs text-muted">
+                            <Money cents={s.current} /> de <Money cents={s.goal.target_cents} />
+                          </span>
+                        </div>
+                        <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-surface-2">
+                          <div className={`h-full ${s.reached ? 'bg-income' : 'bg-brand-600'}`} style={{ width: `${s.ratio * 100}%` }} />
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </Card>
               )}
 
               {pending.length > 0 && (

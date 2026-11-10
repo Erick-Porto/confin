@@ -1,7 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
+import { clearOfflineData } from '@/lib/offline';
 import type { Session, User } from '@supabase/supabase-js';
-import { appUrl, supabase } from '@/lib/supabase';
+import { appUrl, storedSession, supabase } from '@/lib/supabase';
 import type { Profile } from '@/types';
 
 interface AuthContextValue {
@@ -26,6 +28,8 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const queryClientRef = useRef(queryClient);
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -49,7 +53,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     supabase.auth.getSession().then(({ data }) => {
       if (!active) return;
-      setSession(data.session);
+      // Sem internet, o login expirado não renova; usa a sessão guardada para mostrar os dados salvos.
+      // Quando a conexão volta, o supabase-js renova ou encerra a sessão (onAuthStateChange).
+      setSession(data.session ?? (navigator.onLine ? null : storedSession()));
       setLoading(false);
       // Links de e-mail voltam com ?code=... (PKCE) e, na redefinição de senha, ?reset=1.
       const url = new URL(window.location.href);
@@ -73,6 +79,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         navigateRef.current('/redefinir-senha', { replace: true });
       }
       if (event === 'SIGNED_OUT') {
+        // Aparelho compartilhado: nada do usuário anterior fica salvo.
+        void clearOfflineData(queryClientRef.current);
         setProfile(null);
         setRecoveryMode(false);
       }
@@ -106,8 +114,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
+    await clearOfflineData(queryClient);
     navigate('/entrar', { replace: true });
-  }, [navigate]);
+  }, [navigate, queryClient]);
 
   const sendPasswordReset = useCallback(async (email: string) => {
     const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {

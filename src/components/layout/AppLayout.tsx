@@ -3,6 +3,7 @@ import { NavLink, Outlet } from 'react-router-dom';
 import { ChartPie, House, Menu, Plus, ReceiptText } from 'lucide-react';
 import { useUI } from '@/context/UIContext';
 import { Spinner } from '@/components/ui';
+import { OfflineBanner } from '@/features/offline/OfflineBanner';
 import TransactionSheet from '@/features/transactions/TransactionSheet';
 
 const NAV = [
@@ -23,6 +24,7 @@ export function AppLayout() {
         className="mx-auto w-full max-w-lg px-4 pt-safe"
         style={{ paddingBottom: 'calc(96px + env(safe-area-inset-bottom))' }}
       >
+        <OfflineBanner />
         <Suspense
           fallback={
             <div className="flex justify-center py-20 text-brand-700">

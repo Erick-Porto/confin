@@ -8,6 +8,7 @@ import type {
   AccountBalanceAt,
   AccountWithBalance,
   Category,
+  Goal,
   Investment,
   InvestmentValue,
   Invite,
@@ -35,6 +36,7 @@ export const qk = {
   investmentFlows: (groupId: string) => ['investment-flows', groupId] as const,
   balancesAt: (groupId: string, dates: string[]) => ['balances-at', groupId, dates.join(',')] as const,
   tags: (groupId: string) => ['tags', groupId] as const,
+  goals: (groupId: string) => ['goals', groupId] as const,
 };
 
 function useCurrentGroupId(): string | null {
@@ -189,6 +191,30 @@ export function useGroupTags() {
       const { data, error } = await supabase.rpc('group_tags', { p_group: groupId });
       if (error) throw error;
       return (data as Array<{ tag: string; uses: number }>).map((r) => ({ tag: r.tag, uses: Number(r.uses) }));
+    },
+  });
+}
+
+/** Metas do grupo (inclusive arquivadas), pela ordem e depois pelo prazo. */
+export function useGoals() {
+  const groupId = useCurrentGroupId();
+  return useQuery({
+    queryKey: qk.goals(groupId ?? ''),
+    enabled: !!groupId,
+    queryFn: async (): Promise<Goal[]> => {
+      const { data, error } = await supabase
+        .from('goals')
+        .select('*')
+        .eq('group_id', groupId!)
+        .order('sort_order')
+        .order('target_date', { nullsFirst: false })
+        .order('name');
+      if (error) throw error;
+      return (data as Goal[]).map((g) => ({
+        ...g,
+        target_cents: Number(g.target_cents),
+        saved_cents: Number(g.saved_cents),
+      }));
     },
   });
 }

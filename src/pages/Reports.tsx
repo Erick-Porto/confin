@@ -2,13 +2,16 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { ChevronDown } from 'lucide-react';
-import { useAccounts, useCategories, useMembers, useTransactions } from '@/hooks/queries';
+import { ChevronDown, FileSpreadsheet, FileText } from 'lucide-react';
+import { useAccounts, useCategories, useMembers, usePlanBlocks, useTransactions } from '@/hooks/queries';
+import { useGroup } from '@/context/GroupContext';
+import { useUI } from '@/context/UIContext';
+import { buildReport, downloadFile } from '@/features/export/report';
 import { PeriodSwitcher, useMonthStartDay, usePeriodParam } from '@/components/PeriodSwitcher';
 import { CategoryDonut } from '@/components/charts/CategoryDonut';
 import { MonthlyBars } from '@/components/charts/MonthlyBars';
 import { NetWorthCard } from '@/features/investments/NetWorthCard';
-import { Card, EmptyState, Money, PageHeader, Segmented, Skeleton } from '@/components/ui';
+import { Button, Card, EmptyState, Money, PageHeader, Segmented, Skeleton } from '@/components/ui';
 import { errorMessage } from '@/lib/errors';
 import { formatPercent, parseISODate } from '@/lib/format';
 import { isEffective } from '@/lib/rules';
@@ -143,6 +146,10 @@ export default function Reports() {
   const { data: categories = [] } = useCategories();
   const { data: accounts = [] } = useAccounts();
   const { data: members = [] } = useMembers();
+  const { data: planBlocks = [] } = usePlanBlocks();
+  const { currentGroup } = useGroup();
+  const { toast } = useUI();
+  const [exporting, setExporting] = useState<'xlsx' | 'pdf' | null>(null);
 
   const periods = useMemo(() => lastPeriods(6, startDay, period.start), [startDay, period.start]);
   const evolution = tab === 'evolucao';
@@ -166,6 +173,24 @@ export default function Reports() {
   const owners = useMemo(() => expensesByOwner(txs, accounts, members), [txs, accounts, members]);
   const ownersTotal = owners.reduce((s, o) => s + o.cents, 0);
 
+  const exportReport = async (kind: 'xlsx' | 'pdf') => {
+    setExporting(kind);
+    try {
+      // A aba Evolução carrega vários meses: o relatório é só do período escolhido.
+      const periodTxs = txs.filter((t) => t.date >= period.start && t.date <= period.end);
+      const data = buildReport({ groupName: currentGroup?.name ?? 'Grupo', period, txs: periodTxs, categories, accounts, members, planBlocks });
+      const blob =
+        kind === 'xlsx'
+          ? await (await import('@/features/export/reportXlsx')).reportToXlsx(data)
+          : await (await import('@/features/export/reportPdf')).reportToPdf(data);
+      downloadFile(`confin-relatorio-${period.start}.${kind}`, blob);
+    } catch (err) {
+      toast(errorMessage(err), { tone: 'error' });
+    } finally {
+      setExporting(null);
+    }
+  };
+
   const openCategory = (id: string) => {
     if (id === NO_CATEGORY_ID || id === 'others') return;
     navigate(`/extrato?categoria=${id}&tipo=${kind}&periodo=${period.key}`);
@@ -173,7 +198,19 @@ export default function Reports() {
 
   return (
     <div className="pb-6">
-      <PageHeader title="Relatórios" />
+      <PageHeader
+        title="Relatórios"
+        actions={
+          <div className="flex gap-2">
+            <Button variant="secondary" size="sm" className="min-h-[44px]" icon={<FileSpreadsheet size={16} />} loading={exporting === 'xlsx'} disabled={!!exporting || txQ.isPending} onClick={() => void exportReport('xlsx')}>
+              Planilha
+            </Button>
+            <Button variant="secondary" size="sm" className="min-h-[44px]" icon={<FileText size={16} />} loading={exporting === 'pdf'} disabled={!!exporting || txQ.isPending} onClick={() => void exportReport('pdf')}>
+              PDF
+            </Button>
+          </div>
+        }
+      />
       <div className="flex flex-col gap-4">
         <PeriodSwitcher period={period} onChange={setPeriod} />
         <Segmented

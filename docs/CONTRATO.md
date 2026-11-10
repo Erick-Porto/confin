@@ -42,7 +42,7 @@ supabase/migrations/        esquema, RLS, funções e pg_cron
 
 ## Banco (Supabase)
 
-- Tabelas: `profiles`, `groups`, `group_members`, `group_invites`, `accounts`, `categories`, `recurrences`, `transactions`, `audit_log`, `plan_blocks`, `investments`, `investment_values`, `push_subscriptions`, `notification_log` (só o job), `transaction_attachments`; view `account_balances`. Armazenamento: bucket privado `receipts`.
+- Tabelas: `profiles`, `groups`, `group_members`, `group_invites`, `accounts`, `categories`, `recurrences`, `transactions`, `audit_log`, `plan_blocks`, `investments`, `investment_values`, `push_subscriptions`, `notification_log` (só o job), `transaction_attachments`, `goals`; view `account_balances`. `transactions.import_id` é único por conta (importação). Armazenamento: bucket privado `receipts`.
 - RPCs: `create_group(p_name) → uuid`, `create_invite(p_group) → code`, `accept_invite(p_code) → group_id`, `generate_recurrences(p_group, p_horizon_days) → int` (helper `generateRecurrences(groupId)` em `hooks/queries.ts`), `save_plan(p_group, p_blocks, p_categories)` (use `useSavePlan()`), `account_balances_at(p_group, p_dates)` (use `useAccountBalancesAt(dates)`), `group_tags(p_group)` (use `useGroupTags()`), `register_push(...)` (use `enablePush()` de `lib/push.ts`), `delete_group(p_group)`, `delete_my_account()`.
 - `created_by`, `updated_by` e datas são preenchidos pelo banco. Não envie esses campos.
 - Grupos só são criados por `create_group`; membros só entram por `create_group`/`accept_invite`.
@@ -52,7 +52,7 @@ supabase/migrations/        esquema, RLS, funções e pg_cron
 
 ## Dados no app
 
-- Leituras: `useAccounts`, `useCategories`, `useMembers`, `useInvites`, `useTransactions(filters)`, `useRecurrences`, `usePlanBlocks`, `useInvestments`, `useInvestmentValues`, `useInvestmentFlows`, `useAccountBalancesAt(dates)`, `useGroupTags` (`hooks/queries.ts`). `useTransactions` aceita `tag`.
+- Leituras: `useAccounts`, `useCategories`, `useMembers`, `useInvites`, `useTransactions(filters)`, `useRecurrences`, `usePlanBlocks`, `useInvestments`, `useInvestmentValues`, `useInvestmentFlows`, `useAccountBalancesAt(dates)`, `useGroupTags`, `useGoals` (`hooks/queries.ts`). `useTransactions` aceita `tag`.
 - Depois de escrever em lançamentos, contas ou recorrências: `await useInvalidateFinance()()`. Para categorias: `queryClient.invalidateQueries({ queryKey: ['categories'] })`; membros: `['members']`; convites: `['invites']`.
 - Grupo ativo: `useGroup()` (`currentGroup`, `isOwner`, `memberships`, `setCurrentGroupId`, `refresh`) e `useGroupId()` dentro das telas logadas.
 - Rótulo de conta: `accountLabel(account, members)` → "Erick - Nubank" (titular nulo = "Conjunta").
@@ -69,6 +69,8 @@ supabase/migrations/        esquema, RLS, funções e pg_cron
 | `/agenda` | Contas a pagar e a receber (previstos, agendados e faturas dos próximos 30 dias, e atrasados) |
 | `/previsao` | Projeção do saldo disponível (até 180 dias) |
 | `/notificacoes` | Ativar notificações neste aparelho e escolher os avisos (o card "Avisos" do Início leva para cá) |
+| `/metas` | Metas de economia |
+| `/importar` | Importar extrato OFX ou CSV; `?conta=<id>` já escolhe a conta |
 | `/planejamento` | `?periodo=YYYY-MM-DD`; `?editar=1` abre o editor do plano |
 | `/mais` | Grupo, membros, convites, mês financeiro, tema, perfil, sair |
 | `/contas` | Lista e cadastro de contas |
@@ -117,6 +119,18 @@ Tudo em `src/features/attachments/attachments.ts` (leia o comentário do topo):
 - Leituras: `useAttachments(transactionId)`, `useAttachmentCounts(ids)` (Map id → quantidade). Gravações: `useAddAttachment()` (`{ groupId, transactionId, file }`, um arquivo por chamada), `useDeleteAttachment()`. Abrir: `attachmentUrl(a, download?)` = link assinado de 5 min.
 - O banco não apaga arquivos. `useDeleteTransaction` já remove os arquivos dos lançamentos excluídos; antes de `delete_group`, chame `removeGroupAttachmentFiles(groupId)`. Desfazer a exclusão de um lançamento não traz os comprovantes de volta.
 
+## Metas e modo offline (Fase 7)
+
+- Metas: `src/features/goals/goals.ts` — `goalStatus(goal, { accounts, positions })` (progresso, falta, aporte mensal sugerido, atrasada, vínculo removido), `GOAL_KIND_LABELS`, `useSaveGoal`, `useDeleteGoal`, `useAdjustGoalSaved` (só metas manuais). `positions` vem de `portfolio(...)` (investimentos).
+- Offline (só leitura): `src/lib/offline.ts`. O cache do React Query fica no aparelho por 7 dias e é apagado ao sair da conta; sem internet as telas mostram o cache e gravar falha com "Sem conexão". Use `useOnline()` e `lastSyncedAt(queryClient)` para o aviso de offline. Consulta que não deve ir para o cache: inclua a primeira parte da chave em `NOT_PERSISTED`.
+
+## Importar e exportar (Fase 8)
+
+- Ler arquivo: `readImportFile(file)` em `src/features/import/parse.ts` (OFX ou CSV; `csv.mapping` null = pedir as colunas e chamar `applyCsvMapping`). Valores com sinal: + entrada, − saída; `suggestInvert` para faturas com sinal ao contrário.
+- Revisar e gravar: `buildReview(rows, { account, invert, existing, history, categories })`, `toTransactionInputs`, `importTransactions` em `src/features/import/review.ts` (leia o comentário do topo: status `new | imported | duplicate | card-payment`). Depois `useInvalidateFinance()`.
+- OFX: `transactionsToOfx(account, txs, { from, to }, saldoNoFim)` em `src/features/export/ofx.ts`.
+- Relatórios: `buildReport(...)` em `src/features/export/report.ts` gera `ReportData`; `downloadFile(nome, conteúdo, mime)` baixa qualquer arquivo. As bibliotecas de xlsx (`write-excel-file`) e PDF (`jspdf` + `jspdf-autotable`) entram por `import()` dinâmico, só ao exportar.
+
 ## Interface
 
 - Mobile first: largura útil até `max-w-lg` (o `AppLayout` já centraliza e reserva espaço para a barra inferior).
@@ -141,6 +155,8 @@ Tudo em `src/features/attachments/attachments.ts` (leia o comentário do topo):
 | Tags e CSV no extrato | `src/features/tags/**`, `src/pages/Statement.tsx`, `src/pages/Reports.tsx`, `src/features/transactions/TransactionForm.tsx`, `src/components/TransactionRow.tsx` |
 | Agenda, previsão, notificações e conta | `src/pages/Agenda.tsx`, `src/pages/Forecast.tsx`, `src/features/notifications/**`, `src/pages/More.tsx`, `src/pages/Home.tsx`, `src/App.tsx` |
 | Comprovantes | `src/features/attachments/**` (exceto mudar `attachments.ts`), `src/features/transactions/TransactionForm.tsx`, `src/features/transactions/TransactionSheet.tsx`, `src/components/TransactionRow.tsx`, `src/pages/Statement.tsx`, `src/pages/More.tsx` (exclusão do grupo) |
+| Metas e offline | `src/pages/Goals.tsx`, `src/features/goals/**` (exceto mudar `goals.ts`), `src/features/offline/**`, `src/pages/Home.tsx`, `src/components/layout/AppLayout.tsx` |
+| Importar e exportar | `src/pages/Import.tsx`, `src/features/import/**` (exceto mudar `parse.ts` e `review.ts`), `src/features/export/**` (exceto mudar `csv.ts`, `ofx.ts` e `report.ts`), `src/pages/Reports.tsx`, `src/pages/More.tsx` |
 | Infra | `.github/workflows/*`, `scripts/*`, `README.md` |
 
 Precisa mudar um arquivo compartilhado? Não mude: descreva a mudança no relatório final.

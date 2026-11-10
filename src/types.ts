@@ -154,6 +154,31 @@ export interface TransactionAttachment {
   created_at: string;
 }
 
+export type GoalKind = 'manual' | 'account' | 'investment';
+
+/** Meta de economia (Fase 7). */
+export interface Goal {
+  id: string;
+  group_id: string;
+  name: string;
+  /** manual: progresso = saved_cents; account: saldo da conta; investment: valor da aplicação. */
+  kind: GoalKind;
+  target_cents: number;
+  target_date: ISODate | null;
+  saved_cents: number;
+  account_id: string | null;
+  investment_id: string | null;
+  color: string;
+  archived: boolean;
+  sort_order: number;
+  created_at: string;
+}
+
+export type GoalInput = Pick<
+  Goal,
+  'group_id' | 'name' | 'kind' | 'target_cents' | 'target_date' | 'saved_cents' | 'account_id' | 'investment_id' | 'color' | 'archived'
+>;
+
 export type PlanBlockKind = 'spend' | 'invest';
 
 /** Bloco do plano financeiro (Fase 3). Os blocos de um grupo somam 100% da renda. */
@@ -188,6 +213,8 @@ export interface Transaction {
   investment_id: string | null;
   /** Tags livres (Fase 5): minúsculas, sem repetir, até 10. O banco normaliza. */
   tags: string[];
+  /** Linha do extrato importado (FITID do OFX ou resumo da linha do CSV). Único por conta. */
+  import_id: string | null;
   installment_group_id: string | null;
   installment_number: number | null;
   installment_total: number | null;
@@ -212,6 +239,7 @@ export interface TransactionInput {
   recurrence_id?: string | null;
   investment_id?: string | null;
   tags?: string[];
+  import_id?: string | null;
   installment_group_id?: string | null;
   installment_number?: number | null;
   installment_total?: number | null;

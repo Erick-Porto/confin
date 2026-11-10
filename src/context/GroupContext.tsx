@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
+import { readMemberships, storeMemberships } from '@/lib/offline';
 import type { Group, MemberRole, Membership } from '@/types';
 import { useAuth } from './AuthContext';
 
@@ -58,9 +59,12 @@ export function GroupProvider({ children }: { children: ReactNode }) {
       .select('role, group:groups(*)')
       .eq('user_id', userId);
     if (error) console.error(error);
-    const list = ((data ?? []) as unknown as Membership[])
+    // Sem internet, usa a última lista guardada em vez de achar que a pessoa não tem grupos.
+    const source = error ? (readMemberships<Membership[]>(userId) ?? []) : ((data ?? []) as unknown as Membership[]);
+    const list = source
       .filter((m) => m.group)
       .sort((a, b) => a.group.name.localeCompare(b.group.name, 'pt-BR'));
+    if (!error) storeMemberships(userId, list);
     setMemberships(list);
     setLoadedFor(userId);
     return list;

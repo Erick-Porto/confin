@@ -7,7 +7,7 @@ Controle financeiro da família. Grupos (ex.: FinPorto), contas com titular (ex.
 
 ## Status
 
-- Fases 0, 1, 2, 3 (planejamento: modelos como o 50/30/20, regras próprias, planejado x realizado e aporte sugerido), 4 (investimentos: aplicações por classe, aportes, resgates, proventos, rentabilidade, alocação e evolução do patrimônio) 5 (previsão de saldo, contas a pagar e receber, notificações, tags, exportar CSV e excluir a conta) e 6 (comprovantes: fotos e PDFs nos lançamentos, guardados no bucket privado `receipts` do Supabase; o plano gratuito tem 1 GB) implementadas.
+- Fases 0, 1, 2, 3 (planejamento: modelos como o 50/30/20, regras próprias, planejado x realizado e aporte sugerido), 4 (investimentos: aplicações por classe, aportes, resgates, proventos, rentabilidade, alocação e evolução do patrimônio) 5 (previsão de saldo, contas a pagar e receber, notificações, tags, exportar CSV e excluir a conta) e 6 (comprovantes: fotos e PDFs nos lançamentos, guardados no bucket privado `receipts` do Supabase; o plano gratuito tem 1 GB), 7 (metas e modo offline só leitura) e 8 (importar extrato OFX/CSV, exportar OFX e relatórios em xlsx e PDF) implementadas.
 - Testes automatizados e a bateria de testes: pendentes; serão feitos ao final, com autorização.
 
 ## Stack

@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type Session } from '@supabase/supabase-js';
 
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -18,6 +18,18 @@ export const supabase = createClient(url ?? 'http://localhost:54321', anonKey ??
     detectSessionInUrl: true,
   },
 });
+
+/** Sessão que o supabase-js guardou neste aparelho (mesma chave padrão dele), ou null. */
+export function storedSession(): Session | null {
+  try {
+    const ref = new URL(url ?? 'http://localhost').hostname.split('.')[0];
+    const raw = localStorage.getItem(`sb-${ref}-auth-token`);
+    const parsed = raw ? (JSON.parse(raw) as Session) : null;
+    return parsed?.user ? parsed : null;
+  } catch {
+    return null;
+  }
+}
 
 /** URL pública do app (raiz, sem hash), usada nos links de e-mail e de convite. */
 export function appUrl(): string {
