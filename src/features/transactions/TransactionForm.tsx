@@ -22,6 +22,8 @@ import {
 import type { Transaction, TransactionInput, TxStatus, TxType } from '@/types';
 import { AccountChips } from './AccountChips';
 import { AmountInput } from './AmountInput';
+import { AttachmentsSection } from '@/features/attachments/AttachmentsSection';
+import { useAddAttachment } from '@/features/attachments/attachments';
 import { TagInput } from '@/features/tags/TagInput';
 import { CategoryPicker } from './CategoryPicker';
 import {
@@ -80,6 +82,8 @@ export default function TransactionForm({
 
   const save = useSaveTransaction();
   const createInstallments = useCreateInstallments();
+  const addAttachment = useAddAttachment();
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const remove = useDeleteTransaction();
   const restore = useRestoreTransactions();
 
@@ -212,10 +216,22 @@ export default function TransactionForm({
     if (!validate()) return;
     const input = buildInput(paid ? 'posted' : 'planned');
     try {
+      let savedId: string | undefined;
       if (!editing && canInstall && installments) {
-        await createInstallments.mutateAsync({ input, count });
+        const rows = await createInstallments.mutateAsync({ input, count });
+        savedId = rows[0]?.id;
       } else {
-        await save.mutateAsync({ id: transaction?.id, input });
+        savedId = (await save.mutateAsync({ id: transaction?.id, input })).id;
+      }
+      if (!editing && savedId && pendingFiles.length > 0) {
+        try {
+          for (const file of pendingFiles) {
+            await addAttachment.mutateAsync({ groupId, transactionId: savedId, file });
+          }
+        } catch (err) {
+          toast(`Lançamento salvo, mas um comprovante não foi enviado: ${errorMessage(err)}`, { tone: 'error' });
+        }
+        setPendingFiles([]);
       }
       rememberAccount(accountId);
       toast('Lançamento salvo');
@@ -439,6 +455,12 @@ export default function TransactionForm({
           </Field>
 
           <Field label="Tags">{(id) => <TagInput id={id} value={tags} onChange={setTags} />}</Field>
+
+          <AttachmentsSection
+            transactionId={transaction?.id}
+            pendingFiles={pendingFiles}
+            onPendingFilesChange={setPendingFiles}
+          />
 
           {showNotes ? (
             <Field label="Observação">

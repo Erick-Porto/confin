@@ -10,6 +10,7 @@ import { transactionsToCsv } from '@/features/export/csv';
 import { formatDayHeader } from '@/lib/format';
 import { isEffective, isPlanned, sumIncomeExpense } from '@/lib/rules';
 import { PeriodSwitcher, usePeriodParam } from '@/components/PeriodSwitcher';
+import { useAttachmentCounts } from '@/features/attachments/attachments';
 import { TransactionRow } from '@/components/TransactionRow';
 import {
   Button,
@@ -103,6 +104,8 @@ export default function Statement() {
   }, [rawTxs, membro, accounts, query, categories]);
 
   const totals = useMemo(() => sumIncomeExpense(txs), [txs]);
+  const txIds = useMemo(() => txs.map((t) => t.id), [txs]);
+  const { data: attachmentCounts } = useAttachmentCounts(txIds);
   const planned = useMemo(() => {
     const items = txs.filter(isPlanned);
     const net = items.reduce(
@@ -322,7 +325,7 @@ export default function Statement() {
                   </div>
                   <div className="divide-y divide-line/60">
                     {items.map((tx) => (
-                      <TransactionRow key={tx.id} tx={tx} onClick={() => openTransactionSheet({ transaction: tx })} />
+                      <TransactionRow key={tx.id} tx={tx} attachments={attachmentCounts?.get(tx.id)} onClick={() => openTransactionSheet({ transaction: tx })} />
                     ))}
                   </div>
                 </section>

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { ArrowLeftRight } from 'lucide-react';
+import { ArrowLeftRight, Paperclip } from 'lucide-react';
 import { useAccounts, useCategories, useMembers } from '@/hooks/queries';
 import { accountLabel } from '@/lib/accounts';
 import { categoryPath } from '@/lib/categories';
@@ -37,12 +37,15 @@ export function TransactionRow({
   onClick,
   showDate = false,
   trailingExtra,
+  attachments = 0,
 }: {
   tx: Transaction;
   onClick?: () => void;
   showDate?: boolean;
   /** Algo a mais à direita do valor, fora da área clicável da linha (ex.: botão "Confirmar"). */
   trailingExtra?: ReactNode;
+  /** Quantidade de comprovantes; com 1 ou mais mostra o clipe. */
+  attachments?: number;
 }) {
   const { data: categories = [] } = useCategories();
   const { data: accounts = [] } = useAccounts();
@@ -73,6 +76,7 @@ export function TransactionRow({
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className="truncate text-sm font-medium">{title}</span>
+          {attachments > 0 && <Paperclip size={13} className="shrink-0 text-muted" aria-label="Com comprovante" role="img" />}
           <StatusBadge tx={tx} />
         </div>
         <div className="truncate text-xs text-muted">{subtitleParts.join(' · ')}</div>

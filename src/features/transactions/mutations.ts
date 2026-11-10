@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { parseISODate, toISODate } from '@/lib/format';
 import { splitInstallments } from '@/lib/rules';
 import { useInvalidateFinance } from '@/hooks/queries';
+import { attachmentPathsFor, removeAttachmentFiles } from '@/features/attachments/attachments';
 import type { Transaction, TransactionInput } from '@/types';
 
 function normalize(tx: Transaction): Transaction {
@@ -66,6 +67,16 @@ export function useDeleteTransaction() {
   const invalidate = useInvalidateFinance();
   return useMutation({
     mutationFn: async ({ tx, scope = 'one' }: { tx: Transaction; scope?: DeleteScope }): Promise<Transaction[]> => {
+      // Os arquivos dos comprovantes saem pelo app (o banco só apaga as linhas dos anexos).
+      let ids = [tx.id];
+      if (scope !== 'one' && tx.installment_group_id) {
+        let idQuery = supabase.from('transactions').select('id').eq('installment_group_id', tx.installment_group_id);
+        if (scope === 'this-and-next') idQuery = idQuery.gte('installment_number', tx.installment_number ?? 1);
+        const { data: idRows, error: idError } = await idQuery;
+        if (idError) throw idError;
+        ids = (idRows as Array<{ id: string }>).map((r) => r.id);
+      }
+      const paths = await attachmentPathsFor(ids);
       let query = supabase.from('transactions').delete();
       if (scope !== 'one' && tx.installment_group_id) {
         query = query.eq('installment_group_id', tx.installment_group_id);
@@ -75,13 +86,14 @@ export function useDeleteTransaction() {
       }
       const { data, error } = await query.select();
       if (error) throw error;
+      await removeAttachmentFiles(paths);
       return (data as Transaction[]).map(normalize);
     },
     onSuccess: () => invalidate(),
   });
 }
 
-/** Desfaz uma exclusão recriando as linhas (mesmos dados, novos ids). */
+/** Desfaz uma exclusão (os comprovantes não voltam: os arquivos já foram apagados) recriando as linhas (mesmos dados, novos ids). */
 export function useRestoreTransactions() {
   const invalidate = useInvalidateFinance();
   return useMutation({
@@ -98,6 +110,8 @@ export function useRestoreTransactions() {
         to_account_id: t.to_account_id,
         category_id: t.category_id,
         recurrence_id: t.recurrence_id,
+        investment_id: t.investment_id,
+        tags: t.tags,
         installment_group_id: t.installment_group_id,
         installment_number: t.installment_number,
         installment_total: t.installment_total,

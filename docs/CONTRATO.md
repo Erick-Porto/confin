@@ -42,7 +42,7 @@ supabase/migrations/        esquema, RLS, funções e pg_cron
 
 ## Banco (Supabase)
 
-- Tabelas: `profiles`, `groups`, `group_members`, `group_invites`, `accounts`, `categories`, `recurrences`, `transactions`, `audit_log`, `plan_blocks`, `investments`, `investment_values`, `push_subscriptions`, `notification_log` (só o job); view `account_balances`.
+- Tabelas: `profiles`, `groups`, `group_members`, `group_invites`, `accounts`, `categories`, `recurrences`, `transactions`, `audit_log`, `plan_blocks`, `investments`, `investment_values`, `push_subscriptions`, `notification_log` (só o job), `transaction_attachments`; view `account_balances`. Armazenamento: bucket privado `receipts`.
 - RPCs: `create_group(p_name) → uuid`, `create_invite(p_group) → code`, `accept_invite(p_code) → group_id`, `generate_recurrences(p_group, p_horizon_days) → int` (helper `generateRecurrences(groupId)` em `hooks/queries.ts`), `save_plan(p_group, p_blocks, p_categories)` (use `useSavePlan()`), `account_balances_at(p_group, p_dates)` (use `useAccountBalancesAt(dates)`), `group_tags(p_group)` (use `useGroupTags()`), `register_push(...)` (use `enablePush()` de `lib/push.ts`), `delete_group(p_group)`, `delete_my_account()`.
 - `created_by`, `updated_by` e datas são preenchidos pelo banco. Não envie esses campos.
 - Grupos só são criados por `create_group`; membros só entram por `create_group`/`accept_invite`.
@@ -110,6 +110,13 @@ Regras e cálculos em `src/features/investments/portfolio.ts` (não reimplemente
 - Notificações: `src/lib/push.ts` (`getPushState`, `enablePush`, `disablePush`, `showTestNotification`). Preferências em `profiles.notify_bills` e `profiles.notify_budget` (a própria pessoa atualiza o perfil). Quem envia é o job diário `.github/workflows/notify.yml` (`scripts/notify.ts`), por volta das 8h; no iPhone só funciona com o app instalado na tela de início.
 - Excluir grupo: `supabase.rpc('delete_group', { p_group })`. Excluir a própria conta: `supabase.rpc('delete_my_account')` e depois sair (grupos onde a pessoa está sozinha são apagados; nos outros, ela sai e as contas dela viram conjuntas).
 
+## Comprovantes (Fase 6)
+
+Tudo em `src/features/attachments/attachments.ts` (leia o comentário do topo):
+- Arquivo no bucket privado `receipts` (`<group_id>/<transaction_id>/<uuid>.<ext>`) + linha em `transaction_attachments`. Aceita fotos e PDF até 10 MB; `prepareFile` reduz fotos para JPEG de até 1600 px. `ATTACHMENT_ACCEPT` é o accept do input de arquivo.
+- Leituras: `useAttachments(transactionId)`, `useAttachmentCounts(ids)` (Map id → quantidade). Gravações: `useAddAttachment()` (`{ groupId, transactionId, file }`, um arquivo por chamada), `useDeleteAttachment()`. Abrir: `attachmentUrl(a, download?)` = link assinado de 5 min.
+- O banco não apaga arquivos. `useDeleteTransaction` já remove os arquivos dos lançamentos excluídos; antes de `delete_group`, chame `removeGroupAttachmentFiles(groupId)`. Desfazer a exclusão de um lançamento não traz os comprovantes de volta.
+
 ## Interface
 
 - Mobile first: largura útil até `max-w-lg` (o `AppLayout` já centraliza e reserva espaço para a barra inferior).
@@ -133,6 +140,7 @@ Regras e cálculos em `src/features/investments/portfolio.ts` (não reimplemente
 | Investimentos | `src/pages/Investments.tsx`, `src/pages/InvestmentDetail.tsx`, `src/features/investments/**` (exceto mudar `portfolio.ts` e `mutations.ts`) |
 | Tags e CSV no extrato | `src/features/tags/**`, `src/pages/Statement.tsx`, `src/pages/Reports.tsx`, `src/features/transactions/TransactionForm.tsx`, `src/components/TransactionRow.tsx` |
 | Agenda, previsão, notificações e conta | `src/pages/Agenda.tsx`, `src/pages/Forecast.tsx`, `src/features/notifications/**`, `src/pages/More.tsx`, `src/pages/Home.tsx`, `src/App.tsx` |
+| Comprovantes | `src/features/attachments/**` (exceto mudar `attachments.ts`), `src/features/transactions/TransactionForm.tsx`, `src/features/transactions/TransactionSheet.tsx`, `src/components/TransactionRow.tsx`, `src/pages/Statement.tsx`, `src/pages/More.tsx` (exclusão do grupo) |
 | Infra | `.github/workflows/*`, `scripts/*`, `README.md` |
 
 Precisa mudar um arquivo compartilhado? Não mude: descreva a mudança no relatório final.

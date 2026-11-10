@@ -141,6 +141,19 @@ export interface AccountBalanceAt {
   balance_cents: number;
 }
 
+/** Comprovante (foto ou PDF) de um lançamento (Fase 6). O arquivo fica no bucket privado "receipts". */
+export interface TransactionAttachment {
+  id: string;
+  group_id: string;
+  transaction_id: string;
+  /** <group_id>/<transaction_id>/<arquivo> */
+  storage_path: string;
+  file_name: string;
+  mime_type: 'image/jpeg' | 'image/png' | 'image/webp' | 'application/pdf';
+  size_bytes: number;
+  created_at: string;
+}
+
 export type PlanBlockKind = 'spend' | 'invest';
 
 /** Bloco do plano financeiro (Fase 3). Os blocos de um grupo somam 100% da renda. */

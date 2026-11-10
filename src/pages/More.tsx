@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useGroup } from '@/context/GroupContext';
+import { removeGroupAttachmentFiles } from '@/features/attachments/attachments';
 import { useUI } from '@/context/UIContext';
 import { useAccounts, useCategories, useInvites, useMembers } from '@/hooks/queries';
 import { supabase, inviteUrl } from '@/lib/supabase';
@@ -270,6 +271,7 @@ export default function More() {
   async function deleteGroup() {
     setDeleting(true);
     try {
+      await removeGroupAttachmentFiles(groupId);
       const { error } = await supabase.rpc('delete_group', { p_group: groupId });
       if (error) throw error;
       setConfirmDelete(false);
